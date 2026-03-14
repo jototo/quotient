@@ -175,8 +175,10 @@ function initDatabase(): void {
     seedCategories.run('cat_subscriptions','Subscriptions',     null,         '#4E6080', '📱')
     seedCategories.run('cat_education',    'Education',         null,         '#3D8EFF', '📚')
     seedCategories.run('cat_financial',    'Fees & Charges',    null,         '#FF4D72', '💳')
-    seedCategories.run('cat_pets',         'Pets',              null,         '#F59E0B', '🐾')
-    seedCategories.run('cat_gifts',        'Gifts & Donations', null,         '#FF4D72', '🎁')
+    seedCategories.run('cat_pets',             'Pets',                null,         '#F59E0B', '🐾')
+    seedCategories.run('cat_gifts',            'Gifts & Donations',   null,         '#FF4D72', '🎁')
+    seedCategories.run('cat_savings_transfer', 'Savings Transfer',    null,         '#00C9A7', '🏦')
+    seedCategories.run('cat_cc_payment',       'Credit Card Payment', null,         '#4E6080', '💳')
   })
 
   seedAll()

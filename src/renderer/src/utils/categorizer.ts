@@ -4,6 +4,10 @@ interface CategoryRule {
 }
 
 const RULES: CategoryRule[] = [
+  // Transfers — categorized even though is_transfer = true
+  { keywords: ['transfer to sav', 'transfer to savings', 'online transfer to sav', 'savings deposit', 'high yield savings', 'hysa'], categoryId: 'cat_savings_transfer' },
+  { keywords: ['autopay', 'automatic payment', 'online payment', 'payment thank you', 'credit card payment', 'cc payment', 'card payment', 'chase credit', 'amex payment', 'discover payment', 'citi card', 'capital one payment', 'bank of america payment', 'wells fargo payment', 'barclays payment', 'synchrony payment', 'apple card'], categoryId: 'cat_cc_payment' },
+
   // Income
   { keywords: ['direct deposit', 'payroll', 'paycheck', 'ach deposit', 'salary', 'wages'], categoryId: 'cat_paycheck' },
   { keywords: ['tax refund', 'irs', 'state refund'], categoryId: 'cat_refund' },

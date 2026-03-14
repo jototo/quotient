@@ -13,6 +13,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   cat_pharmacy: 'Pharmacy', cat_medical: 'Medical', cat_gym: 'Gym',
   cat_personal: 'Personal Care', cat_pets: 'Pets', cat_education: 'Education',
   cat_financial: 'Fees', cat_gifts: 'Gifts',
+  cat_savings_transfer: 'Savings Transfer', cat_cc_payment: 'CC Payment',
 }
 
 interface Props {
