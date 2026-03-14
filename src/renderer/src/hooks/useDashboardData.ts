@@ -12,6 +12,7 @@ export interface TransactionRow {
   date: number
   description: string
   amount: number
+  is_transfer: number
   category_name: string | null
   category_color: string | null
   account_name: string | null
@@ -77,11 +78,11 @@ export function useDashboardData() {
       window.db.query('SELECT date, net_worth FROM net_worth_history ORDER BY date ASC LIMIT 365'),
       // 5. Recent transactions
       window.db.query(
-        `SELECT t.id, t.date, t.description, t.amount, c.name AS category_name, c.color AS category_color, a.name AS account_name
+        `SELECT t.id, t.date, t.description, t.amount, COALESCE(t.is_transfer, 0) AS is_transfer, c.name AS category_name, c.color AS category_color, a.name AS account_name
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id
          LEFT JOIN accounts a ON t.account_id = a.id
-         WHERE t.is_pending = 0 AND COALESCE(t.is_transfer, 0) = 0
+         WHERE t.is_pending = 0
          ORDER BY t.date DESC, t.created_at DESC
          LIMIT 8`
       ),
