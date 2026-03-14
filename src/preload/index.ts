@@ -8,6 +8,15 @@ const dbAPI = {
   get: (sql: string, params?: unknown[]) => ipcRenderer.invoke('db:get', sql, params)
 }
 
+const dialogAPI = {
+  openFile: (options?: unknown) => ipcRenderer.invoke('dialog:openFile', options),
+  readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
+}
+
+const csvAPI = {
+  import: (rows: unknown[]) => ipcRenderer.invoke('csv:import', rows),
+}
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -15,6 +24,8 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('db', dbAPI)
+    contextBridge.exposeInMainWorld('dialog', dialogAPI)
+    contextBridge.exposeInMainWorld('csv', csvAPI)
   } catch (error) {
     console.error(error)
   }
@@ -23,4 +34,8 @@ if (process.contextIsolated) {
   window.electron = electronAPI
   // @ts-ignore (define in dts)
   window.db = dbAPI
+  // @ts-ignore (define in dts)
+  window.dialog = dialogAPI
+  // @ts-ignore (define in dts)
+  window.csv = csvAPI
 }

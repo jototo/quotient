@@ -1,5 +1,7 @@
 import React from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { ImportProvider, useImport } from '@renderer/context/ImportContext'
+import ImportModal from '@renderer/components/ImportModal'
 
 interface NavItem {
   path: string
@@ -118,9 +120,10 @@ function getPageInfo(pathname: string): { section: string; title: string } {
   return { section: 'Overview', title: 'Dashboard' }
 }
 
-export default function Layout(): React.JSX.Element {
+function LayoutInner(): React.JSX.Element {
   const location = useLocation()
   const { section, title } = getPageInfo(location.pathname)
+  const { open: openImport } = useImport()
 
   return (
     <div
@@ -309,6 +312,21 @@ export default function Layout(): React.JSX.Element {
             </div>
             <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{title}</div>
           </div>
+          <button
+            onClick={openImport}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 16px', borderRadius: 7, border: 'none',
+              background: 'var(--accent)', color: 'var(--bg)', cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+              boxShadow: '0 0 16px rgba(0,201,167,0.2)',
+            }}
+          >
+            <svg viewBox="0 0 14 14" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M7 1v8M3 6l4 4 4-4M2 11h10" />
+            </svg>
+            Import CSV
+          </button>
         </div>
 
         {/* Page content */}
@@ -322,6 +340,15 @@ export default function Layout(): React.JSX.Element {
           <Outlet />
         </div>
       </div>
+      <ImportModal />
     </div>
+  )
+}
+
+export default function Layout(): React.JSX.Element {
+  return (
+    <ImportProvider>
+      <LayoutInner />
+    </ImportProvider>
   )
 }

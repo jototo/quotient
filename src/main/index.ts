@@ -1,7 +1,9 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
+import { readFileSync } from 'fs'
+import { randomUUID } from 'crypto'
 import icon from '../../resources/icon.png?asset'
 
 // Database instance
@@ -110,6 +112,8 @@ function initDatabase(): void {
       asset_type TEXT,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_import_hash ON transactions(import_hash) WHERE import_hash IS NOT NULL;
   `)
 
   console.log('Database initialized at:', dbPath)
@@ -142,6 +146,61 @@ function setupIpcHandlers(): void {
       return { data: stmt.get(...params), error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('dialog:openFile', async (_event, options) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      ...(options || {})
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('fs:readFile', (_event, filePath: string) => {
+    try {
+      return { data: readFileSync(filePath, 'utf-8'), error: null }
+    } catch (e) {
+      return { data: null, error: (e as Error).message }
+    }
+  })
+
+  type CsvImportRow = {
+    accountId: string
+    date: number
+    description: string
+    amount: number
+    importHash: string
+  }
+
+  ipcMain.handle('csv:import', (_event, rows: CsvImportRow[]) => {
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO transactions
+        (id, account_id, date, description, original_description, amount, import_hash, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const insertMany = db.transaction((rows: CsvImportRow[]) => {
+      let inserted = 0
+      for (const row of rows) {
+        const result = insert.run(
+          randomUUID(),
+          row.accountId,
+          row.date,
+          row.description,
+          row.description,
+          row.amount,
+          row.importHash,
+          Date.now()
+        )
+        inserted += result.changes
+      }
+      return { inserted, skipped: rows.length - inserted }
+    })
+    try {
+      return { data: insertMany(rows), error: null }
+    } catch (e) {
+      return { data: null, error: (e as Error).message }
     }
   })
 }
