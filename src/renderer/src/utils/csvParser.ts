@@ -14,6 +14,7 @@ export interface ImportRow {
   amount: number
   importHash: string
   isTransfer: boolean
+  categoryId: string | null
 }
 
 export interface ParseResult {
@@ -113,7 +114,8 @@ export function buildImportHash(accountId: string, date: number, description: st
 export function transformRows(
   rawRows: Record<string, string>[],
   mapping: ColumnMapping,
-  accountId: string
+  accountId: string,
+  categorizeFn?: (desc: string) => string | null
 ): ParseResult {
   const rows: ImportRow[] = []
   let errorCount = 0
@@ -141,7 +143,8 @@ export function transformRows(
     const typeVal = mapping.typeColumn ? (raw[mapping.typeColumn] ?? '') : ''
     const isTransfer = isTransferTransaction(descStr, typeVal)
     const importHash = buildImportHash(accountId, dateMs, descStr, amountVal)
-    rows.push({ accountId, date: dateMs, description: descStr.trim(), amount: amountVal, importHash, isTransfer })
+    const categoryId = categorizeFn ? categorizeFn(descStr.trim()) : null
+    rows.push({ accountId, date: dateMs, description: descStr.trim(), amount: amountVal, importHash, isTransfer, categoryId })
   }
 
   return { rows, errorCount }

@@ -119,6 +119,68 @@ function initDatabase(): void {
   // Migrations — safe to run on every startup
   try { db.exec('ALTER TABLE transactions ADD COLUMN is_transfer INTEGER DEFAULT 0') } catch { /* already exists */ }
 
+  // Seed system categories with stable IDs
+  const seedCategories = db.prepare(`
+    INSERT OR IGNORE INTO categories (id, name, parent_id, color, icon, is_system)
+    VALUES (?, ?, ?, ?, ?, 1)
+  `)
+
+  const seedAll = db.transaction(() => {
+    // Income
+    seedCategories.run('cat_income',       'Income',            null,         '#00D68F', '💼')
+    seedCategories.run('cat_paycheck',     'Paycheck',          'cat_income', '#00D68F', '💼')
+    seedCategories.run('cat_freelance',    'Freelance',         'cat_income', '#00D68F', '💻')
+    seedCategories.run('cat_interest',     'Interest',          'cat_income', '#00D68F', '🏦')
+    seedCategories.run('cat_refund',       'Refund',            'cat_income', '#00D68F', '↩️')
+    // Food
+    seedCategories.run('cat_food',         'Food & Dining',     null,         '#F59E0B', '🍽️')
+    seedCategories.run('cat_groceries',    'Groceries',         'cat_food',   '#F59E0B', '🛒')
+    seedCategories.run('cat_restaurants',  'Restaurants',       'cat_food',   '#F59E0B', '🍽️')
+    seedCategories.run('cat_coffee',       'Coffee & Drinks',   'cat_food',   '#F59E0B', '☕')
+    seedCategories.run('cat_alcohol',      'Bars & Alcohol',    'cat_food',   '#F59E0B', '🍺')
+    // Transport
+    seedCategories.run('cat_transport',    'Transportation',    null,         '#3D8EFF', '🚗')
+    seedCategories.run('cat_gas',          'Gas & Fuel',        'cat_transport','#3D8EFF','⛽')
+    seedCategories.run('cat_parking',      'Parking',           'cat_transport','#3D8EFF','🅿️')
+    seedCategories.run('cat_rideshare',    'Rideshare',         'cat_transport','#3D8EFF','🚕')
+    seedCategories.run('cat_transit',      'Public Transit',    'cat_transport','#3D8EFF','🚇')
+    seedCategories.run('cat_auto',         'Auto & Fees',       'cat_transport','#3D8EFF','🔧')
+    // Housing
+    seedCategories.run('cat_housing',      'Housing',           null,         '#9B6DFF', '🏠')
+    seedCategories.run('cat_rent',         'Rent & Mortgage',   'cat_housing','#9B6DFF', '🏠')
+    seedCategories.run('cat_utilities',    'Utilities',         'cat_housing','#9B6DFF', '⚡')
+    seedCategories.run('cat_internet',     'Internet & Phone',  'cat_housing','#9B6DFF', '📡')
+    seedCategories.run('cat_home_imp',     'Home Improvement',  'cat_housing','#9B6DFF', '🔨')
+    // Shopping
+    seedCategories.run('cat_shopping',     'Shopping',          null,         '#00C9A7', '🛍️')
+    seedCategories.run('cat_online',       'Online Shopping',   'cat_shopping','#00C9A7','📦')
+    seedCategories.run('cat_clothing',     'Clothing',          'cat_shopping','#00C9A7','👕')
+    seedCategories.run('cat_electronics',  'Electronics',       'cat_shopping','#00C9A7','💻')
+    // Entertainment
+    seedCategories.run('cat_entertainment','Entertainment',     null,         '#FF4D72', '🎬')
+    seedCategories.run('cat_streaming',    'Streaming',         'cat_entertainment','#FF4D72','📺')
+    seedCategories.run('cat_gaming',       'Gaming',            'cat_entertainment','#FF4D72','🎮')
+    seedCategories.run('cat_events',       'Events & Activities','cat_entertainment','#FF4D72','🎟️')
+    // Health
+    seedCategories.run('cat_health',       'Health & Fitness',  null,         '#00D68F', '💊')
+    seedCategories.run('cat_medical',      'Medical',           'cat_health', '#00D68F', '🏥')
+    seedCategories.run('cat_pharmacy',     'Pharmacy',          'cat_health', '#00D68F', '💊')
+    seedCategories.run('cat_gym',          'Gym & Fitness',     'cat_health', '#00D68F', '🏃')
+    // Travel
+    seedCategories.run('cat_travel',       'Travel',            null,         '#F59E0B', '✈️')
+    seedCategories.run('cat_flights',      'Flights',           'cat_travel', '#F59E0B', '✈️')
+    seedCategories.run('cat_hotels',       'Hotels',            'cat_travel', '#F59E0B', '🏨')
+    // Personal
+    seedCategories.run('cat_personal',     'Personal Care',     null,         '#4E6080', '🧴')
+    seedCategories.run('cat_subscriptions','Subscriptions',     null,         '#4E6080', '📱')
+    seedCategories.run('cat_education',    'Education',         null,         '#3D8EFF', '📚')
+    seedCategories.run('cat_financial',    'Fees & Charges',    null,         '#FF4D72', '💳')
+    seedCategories.run('cat_pets',         'Pets',              null,         '#F59E0B', '🐾')
+    seedCategories.run('cat_gifts',        'Gifts & Donations', null,         '#FF4D72', '🎁')
+  })
+
+  seedAll()
+
   console.log('Database initialized at:', dbPath)
 }
 
@@ -169,6 +231,19 @@ function setupIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('db:clearTransactions', (_event, accountId?: string) => {
+    try {
+      if (accountId) {
+        db.prepare('DELETE FROM transactions WHERE account_id = ?').run(accountId)
+      } else {
+        db.prepare('DELETE FROM transactions').run()
+      }
+      return { data: true, error: null }
+    } catch (e) {
+      return { data: null, error: (e as Error).message }
+    }
+  })
+
   type CsvImportRow = {
     accountId: string
     date: number
@@ -176,13 +251,14 @@ function setupIpcHandlers(): void {
     amount: number
     importHash: string
     isTransfer: boolean
+    categoryId: string | null
   }
 
   ipcMain.handle('csv:import', (_event, rows: CsvImportRow[]) => {
     const insert = db.prepare(`
       INSERT OR IGNORE INTO transactions
-        (id, account_id, date, description, original_description, amount, import_hash, is_transfer, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, account_id, date, description, original_description, amount, import_hash, is_transfer, category_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const insertMany = db.transaction((rows: CsvImportRow[]) => {
       let inserted = 0
@@ -196,6 +272,7 @@ function setupIpcHandlers(): void {
           row.amount,
           row.importHash,
           row.isTransfer ? 1 : 0,
+          row.categoryId,
           Date.now()
         )
         inserted += result.changes

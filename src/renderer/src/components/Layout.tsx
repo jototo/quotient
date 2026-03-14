@@ -124,6 +124,7 @@ function LayoutInner(): React.JSX.Element {
   const location = useLocation()
   const { section, title } = getPageInfo(location.pathname)
   const { open: openImport } = useImport()
+  const [showResetModal, setShowResetModal] = React.useState(false)
 
   return (
     <div
@@ -279,6 +280,7 @@ function LayoutInner(): React.JSX.Element {
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Local account</div>
           </div>
+          <button onClick={() => setShowResetModal(true)} title="Reset data" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 14, padding: 4, borderRadius: 4 }}>⚙</button>
         </div>
       </aside>
 
@@ -341,6 +343,20 @@ function LayoutInner(): React.JSX.Element {
         </div>
       </div>
       <ImportModal />
+      {showResetModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(7,11,18,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 12, padding: 28, maxWidth: 380, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Reset transaction data?</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13.5, lineHeight: 1.6, marginBottom: 24 }}>
+              This will permanently delete all transactions. Your accounts, categories, and settings will be kept. This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowResetModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 14 }}>Cancel</button>
+              <button onClick={async () => { await window.data.clearTransactions(); setShowResetModal(false) }} style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: 'var(--red)', color: 'white', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600 }}>Delete All Transactions</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

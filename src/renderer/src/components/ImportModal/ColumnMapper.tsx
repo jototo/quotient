@@ -9,7 +9,7 @@ interface Props {
   accounts: Account[]
   initialAccountId: string
   previewRows: Record<string, string>[]
-  onConfirm: (mapping: ColumnMapping, accountId: string) => void
+  onConfirm: (mapping: ColumnMapping, accountId: string, clearFirst: boolean) => void
 }
 
 const ACCOUNT_TYPES = [
@@ -122,6 +122,7 @@ export default function ColumnMapper({ headers, initialMapping, accounts: initia
   const [debitCol, setDebitCol] = useState(initialMapping.debitAmount ?? '')
   const [usesSplitAmount, setUsesSplitAmount] = useState(!initialMapping.amount && (!!initialMapping.creditAmount || !!initialMapping.debitAmount))
   const [typeCol, setTypeCol] = useState(initialMapping.typeColumn ?? '')
+  const [clearFirst, setClearFirst] = useState(false)
 
   const preview = (col: string) => previewRows.map(r => r[col] ?? '—').filter(Boolean).slice(0, 2).join(', ')
 
@@ -136,7 +137,7 @@ export default function ColumnMapper({ headers, initialMapping, accounts: initia
       creditAmount: usesSplitAmount ? creditCol || null : null,
       debitAmount: usesSplitAmount ? debitCol || null : null,
       typeColumn: typeCol || null,
-    }, accountId)
+    }, accountId, clearFirst)
   }
 
   const handleAccountCreated = (account: Account) => {
@@ -183,6 +184,18 @@ export default function ColumnMapper({ headers, initialMapping, accounts: initia
             No accounts yet.
           </div>
         )}
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 8 }}>
+          <input
+            type="checkbox"
+            checked={clearFirst}
+            onChange={e => setClearFirst(e.target.checked)}
+            style={{ accentColor: 'var(--red)', cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: 12.5, color: clearFirst ? 'var(--red)' : 'var(--text-muted)' }}>
+            Clear existing transactions for this account before importing
+          </span>
+        </label>
       </div>
 
       {/* Column mappings */}

@@ -2,6 +2,19 @@ import { useState } from 'react'
 import type { ImportRow } from '@renderer/utils/csvParser'
 import { formatCurrency, formatRelativeDate } from '@renderer/utils/formatters'
 
+const CATEGORY_NAMES: Record<string, string> = {
+  cat_paycheck: 'Paycheck', cat_refund: 'Refund', cat_interest: 'Interest',
+  cat_groceries: 'Groceries', cat_restaurants: 'Restaurants', cat_coffee: 'Coffee',
+  cat_gas: 'Gas', cat_rideshare: 'Rideshare', cat_parking: 'Parking',
+  cat_transit: 'Transit', cat_rent: 'Rent', cat_utilities: 'Utilities',
+  cat_internet: 'Internet', cat_streaming: 'Streaming', cat_online: 'Online',
+  cat_shopping: 'Shopping', cat_clothing: 'Clothing', cat_electronics: 'Electronics',
+  cat_gaming: 'Gaming', cat_flights: 'Flights', cat_hotels: 'Hotels',
+  cat_pharmacy: 'Pharmacy', cat_medical: 'Medical', cat_gym: 'Gym',
+  cat_personal: 'Personal Care', cat_pets: 'Pets', cat_education: 'Education',
+  cat_financial: 'Fees', cat_gifts: 'Gifts',
+}
+
 interface Props {
   rows: ImportRow[]
   errorCount: number
@@ -65,9 +78,9 @@ export default function PreviewTable({ rows, errorCount, onBack, onImport }: Pro
 
       {/* Table */}
       <div style={{ borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 90px 80px', padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-          {['Date', 'Description', 'Amount', viewMode === 'transfers' ? 'Transfer?' : ''].map((h, i) => (
-            <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-muted)', textAlign: i === 2 ? 'right' : 'left' }}>{h}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 120px 90px 80px', padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+          {['Date', 'Description', 'Category', 'Amount', viewMode === 'transfers' ? 'Transfer?' : ''].map((h, i) => (
+            <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-muted)', textAlign: i === 3 ? 'right' : 'left' }}>{h}</div>
           ))}
         </div>
 
@@ -79,13 +92,16 @@ export default function PreviewTable({ rows, errorCount, onBack, onImport }: Pro
 
         {displayRows.map((row, i) => (
           <div key={row._idx} style={{
-            display: 'grid', gridTemplateColumns: '90px 1fr 90px 80px',
+            display: 'grid', gridTemplateColumns: '90px 1fr 120px 90px 80px',
             padding: '9px 14px',
             borderTop: i > 0 ? '1px solid var(--border)' : 'none',
             opacity: row.isTransfer && viewMode === 'all' ? 0.45 : 1,
           }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>{formatRelativeDate(row.date)}</div>
             <div style={{ fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 12 }}>{row.description}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
+              {row.categoryId ? (CATEGORY_NAMES[row.categoryId] ?? row.categoryId) : ''}
+            </div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: row.amount >= 0 ? 'var(--green)' : 'var(--text)', textAlign: 'right' }}>
               {row.amount >= 0 ? '+' : ''}{formatCurrency(row.amount)}
             </div>

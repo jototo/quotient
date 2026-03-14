@@ -3,6 +3,7 @@ import Papa from 'papaparse'
 import { useImport } from '@renderer/context/ImportContext'
 import { detectColumnMapping, transformRows } from '@renderer/utils/csvParser'
 import type { ColumnMapping, ImportRow } from '@renderer/utils/csvParser'
+import { categorize } from '@renderer/utils/categorizer'
 import ColumnMapper from './ColumnMapper'
 import PreviewTable from './PreviewTable'
 
@@ -27,6 +28,7 @@ export default function ImportModal() {
   const [parseErrorCount, setParseErrorCount] = useState(0)
   const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [clearFirst, setClearFirst] = useState(false)
 
   // Load accounts
   useEffect(() => {
@@ -62,8 +64,9 @@ export default function ImportModal() {
     })
   }, [isOpen])
 
-  const handleConfirmMapping = useCallback((m: ColumnMapping, accountId: string) => {
-    const { rows, errorCount } = transformRows(rawRows, m, accountId)
+  const handleConfirmMapping = useCallback((m: ColumnMapping, accountId: string, shouldClear: boolean) => {
+    setClearFirst(shouldClear)
+    const { rows, errorCount } = transformRows(rawRows, m, accountId, categorize)
     setImportRows(rows)
     setParseErrorCount(errorCount)
     setSelectedAccountId(accountId)
@@ -71,11 +74,14 @@ export default function ImportModal() {
   }, [rawRows])
 
   const handleImport = useCallback(async (finalRows: ImportRow[]) => {
+    if (clearFirst && selectedAccountId) {
+      await window.data.clearTransactions(selectedAccountId)
+    }
     const res = await window.csv.import(finalRows)
     if (res.error || !res.data) { setErrorMsg(res.error ?? 'Import failed'); setStep('error'); return }
     setImportResult(res.data)
     setStep('done')
-  }, [importRows])
+  }, [importRows, clearFirst, selectedAccountId])
 
   const handleReset = useCallback(() => {
     setStep('loading')

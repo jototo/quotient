@@ -17,6 +17,8 @@ interface ImportRow {
   description: string
   amount: number
   importHash: string
+  isTransfer: boolean
+  categoryId: string | null
 }
 
 interface ImportResult {
@@ -34,6 +36,9 @@ declare global {
     }
     csv: {
       import: (rows: ImportRow[]) => Promise<{ data: ImportResult | null; error: string | null }>
+    }
+    data: {
+      clearTransactions: (accountId?: string) => Promise<{ data: boolean | null; error: string | null }>
     }
   }
 }

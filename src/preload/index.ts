@@ -17,6 +17,10 @@ const csvAPI = {
   import: (rows: unknown[]) => ipcRenderer.invoke('csv:import', rows),
 }
 
+const dataAPI = {
+  clearTransactions: (accountId?: string) => ipcRenderer.invoke('db:clearTransactions', accountId),
+}
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -26,6 +30,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('db', dbAPI)
     contextBridge.exposeInMainWorld('dialog', dialogAPI)
     contextBridge.exposeInMainWorld('csv', csvAPI)
+    contextBridge.exposeInMainWorld('data', dataAPI)
   } catch (error) {
     console.error(error)
   }
@@ -38,4 +43,6 @@ if (process.contextIsolated) {
   window.dialog = dialogAPI
   // @ts-ignore (define in dts)
   window.csv = csvAPI
+  // @ts-ignore (define in dts)
+  window.data = dataAPI
 }
