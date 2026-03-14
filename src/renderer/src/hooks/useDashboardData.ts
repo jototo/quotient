@@ -63,14 +63,14 @@ export function useDashboardData() {
     Promise.all([
       // 1. Net worth from accounts
       window.db.query('SELECT type, balance FROM accounts WHERE is_hidden = 0'),
-      // 2. Current month spending/income
+      // 2. Current month spending/income (exclude transfers)
       window.db.query(
-        'SELECT SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS spending, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income FROM transactions WHERE date >= ? AND date < ? AND is_pending = 0',
+        'SELECT SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS spending, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income FROM transactions WHERE date >= ? AND date < ? AND is_pending = 0 AND COALESCE(is_transfer, 0) = 0',
         [curStart, curEnd]
       ),
-      // 3. Previous month spending/income
+      // 3. Previous month spending/income (exclude transfers)
       window.db.query(
-        'SELECT SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS spending, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income FROM transactions WHERE date >= ? AND date < ? AND is_pending = 0',
+        'SELECT SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS spending, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income FROM transactions WHERE date >= ? AND date < ? AND is_pending = 0 AND COALESCE(is_transfer, 0) = 0',
         [prevStart, prevEnd]
       ),
       // 4. Net worth history
@@ -81,7 +81,7 @@ export function useDashboardData() {
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id
          LEFT JOIN accounts a ON t.account_id = a.id
-         WHERE t.is_pending = 0
+         WHERE t.is_pending = 0 AND COALESCE(t.is_transfer, 0) = 0
          ORDER BY t.date DESC, t.created_at DESC
          LIMIT 8`
       ),

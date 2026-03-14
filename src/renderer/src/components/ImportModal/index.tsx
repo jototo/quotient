@@ -70,8 +70,8 @@ export default function ImportModal() {
     setStep('preview')
   }, [rawRows])
 
-  const handleImport = useCallback(async () => {
-    const res = await window.csv.import(importRows)
+  const handleImport = useCallback(async (finalRows: ImportRow[]) => {
+    const res = await window.csv.import(finalRows)
     if (res.error || !res.data) { setErrorMsg(res.error ?? 'Import failed'); setStep('error'); return }
     setImportResult(res.data)
     setStep('done')

@@ -116,6 +116,9 @@ function initDatabase(): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_import_hash ON transactions(import_hash) WHERE import_hash IS NOT NULL;
   `)
 
+  // Migrations — safe to run on every startup
+  try { db.exec('ALTER TABLE transactions ADD COLUMN is_transfer INTEGER DEFAULT 0') } catch { /* already exists */ }
+
   console.log('Database initialized at:', dbPath)
 }
 
@@ -172,13 +175,14 @@ function setupIpcHandlers(): void {
     description: string
     amount: number
     importHash: string
+    isTransfer: boolean
   }
 
   ipcMain.handle('csv:import', (_event, rows: CsvImportRow[]) => {
     const insert = db.prepare(`
       INSERT OR IGNORE INTO transactions
-        (id, account_id, date, description, original_description, amount, import_hash, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (id, account_id, date, description, original_description, amount, import_hash, is_transfer, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     const insertMany = db.transaction((rows: CsvImportRow[]) => {
       let inserted = 0
@@ -191,6 +195,7 @@ function setupIpcHandlers(): void {
           row.description,
           row.amount,
           row.importHash,
+          row.isTransfer ? 1 : 0,
           Date.now()
         )
         inserted += result.changes

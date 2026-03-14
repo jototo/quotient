@@ -121,6 +121,7 @@ export default function ColumnMapper({ headers, initialMapping, accounts: initia
   const [creditCol, setCreditCol] = useState(initialMapping.creditAmount ?? '')
   const [debitCol, setDebitCol] = useState(initialMapping.debitAmount ?? '')
   const [usesSplitAmount, setUsesSplitAmount] = useState(!initialMapping.amount && (!!initialMapping.creditAmount || !!initialMapping.debitAmount))
+  const [typeCol, setTypeCol] = useState(initialMapping.typeColumn ?? '')
 
   const preview = (col: string) => previewRows.map(r => r[col] ?? '—').filter(Boolean).slice(0, 2).join(', ')
 
@@ -134,6 +135,7 @@ export default function ColumnMapper({ headers, initialMapping, accounts: initia
       amount: usesSplitAmount ? null : amountCol || null,
       creditAmount: usesSplitAmount ? creditCol || null : null,
       debitAmount: usesSplitAmount ? debitCol || null : null,
+      typeColumn: typeCol || null,
     }, accountId)
   }
 
@@ -234,6 +236,23 @@ export default function ColumnMapper({ headers, initialMapping, accounts: initia
             </div>
           </div>
         )}
+      </div>
+
+      {/* Type / Category column */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={LABEL_STYLE}>Transaction Type Column</div>
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>(optional)</span>
+        </div>
+        <select value={typeCol} onChange={e => setTypeCol(e.target.value)} style={SELECT_STYLE}>
+          <option value="">— none —</option>
+          {headers.map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+        <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          If your CSV has a Type or Category column, selecting it helps automatically detect transfers
+          (credit card payments, account transfers) and exclude them from spending totals.
+          {typeCol && <span style={{ color: 'var(--accent)', marginLeft: 4 }}>Preview: {previewRows.map(r => r[typeCol] || '—').slice(0, 3).join(', ')}</span>}
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid var(--border)' }}>

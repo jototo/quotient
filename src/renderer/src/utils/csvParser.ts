@@ -4,6 +4,7 @@ export interface ColumnMapping {
   amount: string | null
   creditAmount: string | null
   debitAmount: string | null
+  typeColumn: string | null  // optional bank type/category column
 }
 
 export interface ImportRow {
@@ -12,11 +13,33 @@ export interface ImportRow {
   description: string
   amount: number
   importHash: string
+  isTransfer: boolean
 }
 
 export interface ParseResult {
   rows: ImportRow[]
   errorCount: number
+}
+
+// Values in a bank's "Type" column that indicate a transfer/payment (not real spending)
+const TRANSFER_TYPE_KEYWORDS = ['transfer', 'payment', 'ach']
+
+// Substrings in the description that indicate a transfer/payment
+const TRANSFER_DESC_KEYWORDS = [
+  'transfer to', 'transfer from', 'online transfer',
+  'account transfer', 'zelle to', 'zelle from',
+  'autopay', 'automatic payment', 'payment thank you',
+  'payment received', 'credit card payment', 'cc payment',
+  'ach payment', 'ach transfer', 'internal transfer',
+]
+
+export function isTransferTransaction(description: string, typeValue?: string): boolean {
+  const desc = description.toLowerCase()
+  if (typeValue) {
+    const type = typeValue.toLowerCase()
+    if (TRANSFER_TYPE_KEYWORDS.some(k => type.includes(k))) return true
+  }
+  return TRANSFER_DESC_KEYWORDS.some(k => desc.includes(k))
 }
 
 export function detectColumnMapping(headers: string[]): Partial<ColumnMapping> {
@@ -28,6 +51,7 @@ export function detectColumnMapping(headers: string[]): Partial<ColumnMapping> {
     if (!mapping.creditAmount && (lower === 'credit' || lower.includes('credit amount') || lower === 'deposits')) mapping.creditAmount = h
     if (!mapping.debitAmount && (lower === 'debit' || lower.includes('debit amount') || lower === 'withdrawals')) mapping.debitAmount = h
     if (!mapping.amount && lower === 'amount' && !lower.includes('credit') && !lower.includes('debit')) mapping.amount = h
+    if (!mapping.typeColumn && (lower === 'type' || lower === 'transaction type' || lower === 'category' || lower === 'transaction category')) mapping.typeColumn = h
   }
   return mapping
 }
@@ -114,8 +138,10 @@ export function transformRows(
       continue
     }
 
+    const typeVal = mapping.typeColumn ? (raw[mapping.typeColumn] ?? '') : ''
+    const isTransfer = isTransferTransaction(descStr, typeVal)
     const importHash = buildImportHash(accountId, dateMs, descStr, amountVal)
-    rows.push({ accountId, date: dateMs, description: descStr.trim(), amount: amountVal, importHash })
+    rows.push({ accountId, date: dateMs, description: descStr.trim(), amount: amountVal, importHash, isTransfer })
   }
 
   return { rows, errorCount }
