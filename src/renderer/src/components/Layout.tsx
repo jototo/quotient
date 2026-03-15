@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ImportProvider, useImport } from '@renderer/context/ImportContext'
 import ImportModal from '@renderer/components/ImportModal'
+import KeyboardShortcutsModal from '@renderer/components/KeyboardShortcutsModal'
 
 interface NavItem {
   path: string
@@ -151,12 +152,16 @@ function LayoutInner(): React.JSX.Element {
   const location = useLocation()
   const { section, title } = getPageInfo(location.pathname)
   const { open: openImport } = useImport()
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       if (e.metaKey && e.key === 'i') {
         e.preventDefault()
         openImport()
+      } else if (e.metaKey && e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts(s => !s)
       }
     }
     window.addEventListener('keydown', handler)
@@ -350,21 +355,35 @@ function LayoutInner(): React.JSX.Element {
             </div>
             <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{title}</div>
           </div>
-          <button
-            onClick={openImport}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '7px 16px', borderRadius: 7, border: 'none',
-              background: 'var(--accent)', color: 'var(--bg)', cursor: 'pointer',
-              fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
-              boxShadow: '0 0 16px rgba(0,201,167,0.2)',
-            }}
-          >
-            <svg viewBox="0 0 14 14" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M7 1v8M3 6l4 4 4-4M2 11h10" />
-            </svg>
-            Import CSV
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setShowShortcuts(true)}
+              title="Keyboard shortcuts (⌘?)"
+              style={{
+                width: 32, height: 32, borderRadius: 7,
+                border: '1px solid var(--border-2)',
+                background: 'var(--surface-3)', color: 'var(--text-muted)',
+                cursor: 'pointer', fontFamily: 'var(--font-mono)',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >?</button>
+            <button
+              onClick={openImport}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '7px 16px', borderRadius: 7, border: 'none',
+                background: 'var(--accent)', color: 'var(--bg)', cursor: 'pointer',
+                fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600,
+                boxShadow: '0 0 16px rgba(0,201,167,0.2)',
+              }}
+            >
+              <svg viewBox="0 0 14 14" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M7 1v8M3 6l4 4 4-4M2 11h10" />
+              </svg>
+              Import CSV
+            </button>
+          </div>
         </div>
 
         {/* Page content */}
@@ -379,6 +398,7 @@ function LayoutInner(): React.JSX.Element {
         </div>
       </div>
       <ImportModal />
+      {showShortcuts && <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />}
     </div>
   )
 }
