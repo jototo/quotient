@@ -31,8 +31,7 @@ declare global {
     electron: ElectronAPI
     db: DbAPI
     dialog: {
-      openFile: (options?: unknown) => Promise<string | null>
-      readFile: (filePath: string) => Promise<{ data: string | null; error: string | null }>
+      openAndReadCSV: () => Promise<{ data: string | null; fileName: string | null; error: string | null }>
     }
     csv: {
       import: (rows: ImportRow[]) => Promise<{ data: ImportResult | null; error: string | null }>

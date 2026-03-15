@@ -41,27 +41,28 @@ export default function ImportModal() {
     })
   }, [isOpen])
 
+  const openCSVFile = useCallback(() => {
+    setStep('loading')
+    window.dialog.openAndReadCSV().then((res) => {
+      if (!res.data) { if (!res.error) { close(); return } setErrorMsg(res.error ?? 'Could not read file'); setStep('error'); return }
+      setFileName(res.fileName ?? '')
+      const result = Papa.parse<Record<string, string>>(res.data, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false,
+      })
+      const hdrs = result.meta.fields ?? []
+      setHeaders(hdrs)
+      setRawRows(result.data)
+      setMapping(detectColumnMapping(hdrs))
+      setStep('mapping')
+    })
+  }, [close])
+
   // Open file dialog when modal opens
   useEffect(() => {
     if (!isOpen) return
-    setStep('loading')
-    window.dialog.openFile().then((filePath) => {
-      if (!filePath) { close(); return }
-      setFileName(filePath.split('/').pop() ?? filePath)
-      window.dialog.readFile(filePath).then((res) => {
-        if (res.error || !res.data) { setErrorMsg(res.error ?? 'Could not read file'); setStep('error'); return }
-        const result = Papa.parse<Record<string, string>>(res.data, {
-          header: true,
-          skipEmptyLines: true,
-          dynamicTyping: false,
-        })
-        const hdrs = result.meta.fields ?? []
-        setHeaders(hdrs)
-        setRawRows(result.data)
-        setMapping(detectColumnMapping(hdrs))
-        setStep('mapping')
-      })
-    })
+    openCSVFile()
   }, [isOpen])
 
   const handleConfirmMapping = useCallback((m: ColumnMapping, accountId: string, shouldClear: boolean) => {
@@ -84,7 +85,6 @@ export default function ImportModal() {
   }, [importRows, clearFirst, selectedAccountId])
 
   const handleReset = useCallback(() => {
-    setStep('loading')
     setFileName('')
     setHeaders([])
     setRawRows([])
@@ -93,21 +93,8 @@ export default function ImportModal() {
     setParseErrorCount(0)
     setImportResult(null)
     setErrorMsg('')
-    // Re-trigger file dialog
-    window.dialog.openFile().then((filePath) => {
-      if (!filePath) { close(); return }
-      setFileName(filePath.split('/').pop() ?? filePath)
-      window.dialog.readFile(filePath).then((res) => {
-        if (res.error || !res.data) { setErrorMsg(res.error ?? 'Could not read file'); setStep('error'); return }
-        const result = Papa.parse<Record<string, string>>(res.data, { header: true, skipEmptyLines: true, dynamicTyping: false })
-        const hdrs = result.meta.fields ?? []
-        setHeaders(hdrs)
-        setRawRows(result.data)
-        setMapping(detectColumnMapping(hdrs))
-        setStep('mapping')
-      })
-    })
-  }, [close])
+    openCSVFile()
+  }, [openCSVFile])
 
   if (!isOpen) return null
 

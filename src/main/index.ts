@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { randomUUID } from 'crypto'
 import icon from '../../resources/icon.png?asset'
 
@@ -183,7 +183,7 @@ function initDatabase(): void {
 
   seedAll()
 
-  console.log('Database initialized at:', dbPath)
+  if (is.dev) console.log('Database initialized at:', dbPath)
 }
 
 // IPC handlers for database operations
@@ -216,25 +216,31 @@ function setupIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle('dialog:openFile', async (_event, options) => {
+  // Atomic: open dialog + read file in one IPC call so renderer never handles a raw file path
+  ipcMain.handle('dialog:openAndReadCSV', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [{ name: 'CSV Files', extensions: ['csv'] }],
-      ...(options || {})
     })
-    return result.canceled ? null : result.filePaths[0]
-  })
-
-  ipcMain.handle('fs:readFile', (_event, filePath: string) => {
+    if (result.canceled || !result.filePaths[0]) return { data: null, fileName: null, error: null }
+    const filePath = result.filePaths[0]
     try {
-      return { data: readFileSync(filePath, 'utf-8'), error: null }
+      const data = readFileSync(filePath, 'utf-8')
+      return { data, fileName: filePath.split('/').pop() ?? filePath, error: null }
     } catch (e) {
-      return { data: null, error: (e as Error).message }
+      return { data: null, fileName: null, error: (e as Error).message }
     }
   })
 
   ipcMain.handle('db:clearTransactions', (_event, accountId?: string) => {
     try {
+      // Write a JSON backup before deleting
+      const backupRows = accountId
+        ? db.prepare('SELECT * FROM transactions WHERE account_id = ?').all(accountId)
+        : db.prepare('SELECT * FROM transactions').all()
+      const backupPath = join(app.getPath('userData'), `transactions-backup-${Date.now()}.json`)
+      writeFileSync(backupPath, JSON.stringify(backupRows, null, 2), 'utf-8')
+
       if (accountId) {
         db.prepare('DELETE FROM transactions WHERE account_id = ?').run(accountId)
       } else {
@@ -301,7 +307,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      contextIsolation: true,
+      sandbox: true
     }
   })
 
@@ -364,6 +371,7 @@ app.on('window-all-closed', () => {
 // Clean up database on quit
 app.on('before-quit', () => {
   if (db) {
+    db.exec('PRAGMA wal_checkpoint(RESTART)')
     db.close()
   }
 })
