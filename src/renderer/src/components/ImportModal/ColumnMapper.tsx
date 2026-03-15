@@ -9,18 +9,21 @@ interface Props {
   accounts: Account[]
   initialAccountId: string
   previewRows: Record<string, string>[]
-  onConfirm: (mapping: ColumnMapping, accountId: string, clearFirst: boolean) => void
+  onConfirm: (mapping: ColumnMapping, accountId: string, clearFirst: boolean) => void | Promise<void>
 }
 
 const ACCOUNT_TYPES = [
-  { value: 'checking',    label: 'Checking' },
-  { value: 'savings',     label: 'Savings' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'investment',  label: 'Investment' },
-  { value: 'real_estate', label: 'Real Estate' },
-  { value: 'vehicle',     label: 'Vehicle' },
-  { value: 'loan',        label: 'Loan' },
-  { value: 'other',       label: 'Other' },
+  { value: 'checking',         label: 'Checking' },
+  { value: 'savings',          label: 'Savings' },
+  { value: 'credit_card',      label: 'Credit Card' },
+  { value: 'investment',       label: 'Investment' },
+  { value: '401k',             label: '401(k)' },
+  { value: 'ira',              label: 'IRA' },
+  { value: 'real_estate',      label: 'Real Estate' },
+  { value: 'vehicle',          label: 'Vehicle' },
+  { value: 'personal_property',label: 'Personal Property' },
+  { value: 'loan',             label: 'Loan' },
+  { value: 'other',            label: 'Other' },
 ]
 
 const SELECT_STYLE = {

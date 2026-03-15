@@ -8,6 +8,7 @@ export interface TransactionFilters {
   amountMin: number | null
   amountMax: number | null
   showTransfers: boolean
+  onlyUncategorized: boolean
   sortBy: 'date' | 'amount'
   sortDir: 'asc' | 'desc'
   page: number
@@ -45,6 +46,7 @@ const DEFAULT_FILTERS: TransactionFilters = {
   amountMin: null,
   amountMax: null,
   showTransfers: true,
+  onlyUncategorized: false,
   sortBy: 'date',
   sortDir: 'desc',
   page: 0,
@@ -74,7 +76,7 @@ export function useTransactions(): UseTransactionsResult {
     cancelledRef.current = false
     setLoading(true)
 
-    const { search, accountIds, dateFrom, dateTo, amountMin, amountMax, showTransfers, sortBy, sortDir, page } = filters
+    const { search, accountIds, dateFrom, dateTo, amountMin, amountMax, showTransfers, onlyUncategorized, sortBy, sortDir, page } = filters
 
     const conditions: string[] = ['1=1']
     const params: unknown[] = []
@@ -108,6 +110,9 @@ export function useTransactions(): UseTransactionsResult {
     }
     if (!showTransfers) {
       conditions.push('COALESCE(t.is_transfer, 0) = 0')
+    }
+    if (onlyUncategorized) {
+      conditions.push('t.category_id IS NULL')
     }
 
     const whereClause = conditions.join(' AND ')

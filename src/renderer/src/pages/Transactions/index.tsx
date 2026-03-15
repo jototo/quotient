@@ -13,12 +13,14 @@ interface CategoryOption {
 
 // ─── Skeleton row ─────────────────────────────────────────────────────────────
 
+const COL_TEMPLATE = '36px 100px 1fr 160px 160px 110px'
+
 function SkeletonRow(): React.JSX.Element {
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '100px 1fr 160px 160px 110px',
+        gridTemplateColumns: COL_TEMPLATE,
         alignItems: 'center',
         padding: '0 28px',
         height: 48,
@@ -27,7 +29,7 @@ function SkeletonRow(): React.JSX.Element {
         position: 'relative',
       }}
     >
-      {[80, 220, 100, 120, 70].map((w, i) => (
+      {[14, 80, 220, 100, 120, 70].map((w, i) => (
         <div
           key={i}
           style={{
@@ -42,24 +44,142 @@ function SkeletonRow(): React.JSX.Element {
   )
 }
 
+// ─── Bulk action bar ──────────────────────────────────────────────────────────
+
+function BulkActionBar({ count, categories, onSetCategory, onSetTransfer, onDelete, onClear }: {
+  count: number
+  categories: CategoryOption[]
+  onSetCategory: (catId: string | null) => void
+  onSetTransfer: (val: 0 | 1) => void
+  onDelete: () => void
+  onClear: () => void
+}): React.JSX.Element {
+  const btnStyle: React.CSSProperties = {
+    padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border-2)',
+    background: 'var(--surface-2)', color: 'var(--text-muted)', cursor: 'pointer',
+    fontFamily: 'var(--font-ui)', fontSize: 12,
+  }
+
+  return (
+    <div style={{
+      padding: '7px 28px', background: 'rgba(61,142,255,0.06)',
+      borderBottom: '1px solid rgba(61,142,255,0.2)',
+      display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap',
+    }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-2)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+        {count} selected
+      </span>
+      <div style={{ width: 1, height: 16, background: 'var(--border-2)', flexShrink: 0 }} />
+
+      {/* Category */}
+      <select
+        value=""
+        onChange={e => { if (e.target.value) onSetCategory(e.target.value === '__clear__' ? null : e.target.value) }}
+        style={{ ...btnStyle, paddingRight: 6 }}
+      >
+        <option value="" disabled>Set category…</option>
+        <option value="__clear__">— Clear category</option>
+        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+
+      <button onClick={() => onSetTransfer(1)} style={btnStyle}>↔ Mark transfer</button>
+      <button onClick={() => onSetTransfer(0)} style={btnStyle}>✓ Unmark transfer</button>
+
+      <div style={{ width: 1, height: 16, background: 'var(--border-2)', flexShrink: 0 }} />
+      <button
+        onClick={onDelete}
+        style={{ ...btnStyle, color: 'var(--red)', borderColor: 'rgba(255,77,114,0.3)', background: 'rgba(255,77,114,0.06)' }}
+      >
+        🗑 Delete
+      </button>
+
+      <button onClick={onClear} style={{ ...btnStyle, marginLeft: 'auto', fontSize: 11 }}>✕ Clear selection</button>
+    </div>
+  )
+}
+
+// ─── Pending rule bar ─────────────────────────────────────────────────────────
+
+function PendingRuleBar({ initialKeyword, categoryName, categoryId, onSave, onSkip }: {
+  initialKeyword: string
+  categoryName: string
+  categoryId: string
+  onSave: (keyword: string, categoryId: string) => void
+  onSkip: () => void
+}): React.JSX.Element {
+  const [keyword, setKeyword] = useState(initialKeyword)
+  const btnStyle: React.CSSProperties = {
+    padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border-2)',
+    background: 'var(--surface-2)', color: 'var(--text-muted)', cursor: 'pointer',
+    fontFamily: 'var(--font-ui)', fontSize: 12,
+  }
+  return (
+    <div style={{
+      padding: '7px 28px', background: 'rgba(0,201,167,0.05)',
+      borderBottom: '1px solid rgba(0,201,167,0.18)',
+      display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap',
+    }}>
+      <span style={{ fontSize: 12, color: 'var(--accent)', flexShrink: 0 }}>💡 Save rule for future imports?</span>
+      <div style={{ width: 1, height: 16, background: 'var(--border-2)', flexShrink: 0 }} />
+      <input
+        autoFocus
+        value={keyword}
+        onChange={e => setKeyword(e.target.value)}
+        placeholder="keyword"
+        style={{
+          background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 5,
+          color: 'var(--text)', padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 12,
+          width: 160, outline: 'none',
+        }}
+      />
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>→ {categoryName}</span>
+      <button
+        onClick={() => onSave(keyword, categoryId)}
+        disabled={!keyword.trim()}
+        style={{ ...btnStyle, background: 'var(--accent)', color: 'var(--bg)', border: 'none', fontWeight: 600, opacity: keyword.trim() ? 1 : 0.5 }}
+      >
+        Save Rule
+      </button>
+      <button onClick={onSkip} style={{ ...btnStyle, fontSize: 11 }}>Skip</button>
+    </div>
+  )
+}
+
+// ─── Keyword extractor for auto-rule suggestion ────────────────────────────────
+
+function extractKeyword(description: string): string {
+  // Strip common bank prefixes like "SQ *", "TST* ", "PP*"
+  const stripped = description.replace(/^[A-Z]{2,4}[* ]\s*/i, '').trim()
+  const words = stripped.split(/[\s\-_#@./,]+/)
+  for (const word of words) {
+    const alpha = word.replace(/[^a-zA-Z]/g, '')
+    if (alpha.length >= 4) return alpha.toLowerCase()
+  }
+  return stripped.split(/\s+/)[0].toLowerCase() || description.slice(0, 20).toLowerCase()
+}
+
 // ─── Category cell with inline select ─────────────────────────────────────────
 
 interface CategoryCellProps {
   txId: string
+  description: string
   categoryId: string | null
   categoryName: string | null
   categoryColor: string | null
   categories: CategoryOption[]
   onChanged: () => void
+  onSuggestRule?: (keyword: string, categoryId: string, categoryName: string) => void
 }
 
 function CategoryCell({
   txId,
+  description,
   categoryId,
   categoryName,
   categoryColor,
   categories,
   onChanged,
+  onSuggestRule,
 }: CategoryCellProps): React.JSX.Element {
   const [editing, setEditing] = useState(false)
 
@@ -67,6 +187,10 @@ function CategoryCell({
     const val = e.target.value || null
     setEditing(false)
     await window.db.run('UPDATE transactions SET category_id = ? WHERE id = ?', [val, txId])
+    if (val && val !== categoryId && onSuggestRule) {
+      const cat = categories.find(c => c.id === val)
+      if (cat) onSuggestRule(extractKeyword(description), val, cat.name)
+    }
     onChanged()
   }
 
@@ -203,6 +327,7 @@ interface RowMenuProps {
   onAction: () => void
   onDelete: () => void
   onEditNote: () => void
+  onSelectSimilar: () => void
 }
 
 function RowMenu({
@@ -213,6 +338,7 @@ function RowMenu({
   onAction,
   onDelete,
   onEditNote,
+  onSelectSimilar,
 }: RowMenuProps): React.JSX.Element {
   const isOpen = openMenuId === txId
   const [deleteStep, setDeleteStep] = useState<'idle' | 'confirm'>('idle')
@@ -244,6 +370,12 @@ function RowMenu({
     e.stopPropagation()
     setOpenMenuId(null)
     onEditNote()
+  }
+
+  const handleSelectSimilar = (e: React.MouseEvent): void => {
+    e.stopPropagation()
+    setOpenMenuId(null)
+    onSelectSimilar()
   }
 
   const menuBtnStyle: React.CSSProperties = {
@@ -295,6 +427,14 @@ function RowMenu({
           >
             <span style={{ fontSize: 13 }}>✎</span> Edit note
           </button>
+          <button
+            onClick={handleSelectSimilar}
+            style={menuBtnStyle}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-3)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+          >
+            <span style={{ fontSize: 13 }}>⊞</span> Select all similar
+          </button>
           <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
           <button
             onClick={handleDelete}
@@ -334,6 +474,10 @@ interface TransactionRowProps {
   onRefetch: () => void
   onDelete: (id: string) => void
   onEditNote: (tx: TransactionRowProps['tx']) => void
+  selected: boolean
+  onToggleSelect: (id: string) => void
+  onSelectSimilar: (description: string) => void
+  onSuggestRule: (keyword: string, categoryId: string, categoryName: string) => void
 }
 
 function TxRow({
@@ -344,6 +488,10 @@ function TxRow({
   onRefetch,
   onDelete,
   onEditNote,
+  selected,
+  onToggleSelect,
+  onSelectSimilar,
+  onSuggestRule,
 }: TransactionRowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
 
@@ -368,17 +516,30 @@ function TxRow({
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '100px 1fr 160px 160px 110px',
+        gridTemplateColumns: COL_TEMPLATE,
         alignItems: 'center',
         padding: '0 28px',
         minHeight: 48,
         borderBottom: '1px solid var(--border)',
-        background: hovered ? 'var(--surface-2)' : 'transparent',
-        opacity: tx.is_transfer ? 0.5 : 1,
+        background: selected ? 'rgba(61,142,255,0.07)' : hovered ? 'var(--surface-2)' : 'transparent',
+        opacity: tx.is_transfer && !selected ? 0.5 : 1,
         position: 'relative',
         transition: 'background 0.1s',
       }}
     >
+      {/* Checkbox */}
+      <div onClick={e => { e.stopPropagation(); onToggleSelect(tx.id) }} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+        <div style={{
+          width: 15, height: 15, borderRadius: 4, border: '1px solid',
+          borderColor: selected ? 'var(--accent-2)' : (hovered ? 'var(--border-2)' : 'transparent'),
+          background: selected ? 'var(--accent-2)' : 'transparent',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          transition: 'all 0.1s',
+        }}>
+          {selected && <span style={{ fontSize: 9, color: 'var(--bg)', fontWeight: 700, lineHeight: 1 }}>✓</span>}
+        </div>
+      </div>
+
       {/* Date */}
       <div
         style={{
@@ -431,11 +592,13 @@ function TxRow({
       {/* Category */}
       <CategoryCell
         txId={tx.id}
+        description={tx.description}
         categoryId={tx.category_id}
         categoryName={tx.category_name}
         categoryColor={tx.category_color}
         categories={categories}
         onChanged={onRefetch}
+        onSuggestRule={onSuggestRule}
       />
 
       {/* Amount */}
@@ -463,6 +626,7 @@ function TxRow({
               onAction={onRefetch}
               onDelete={() => onDelete(tx.id)}
               onEditNote={() => onEditNote(tx)}
+              onSelectSimilar={() => onSelectSimilar(tx.description)}
             />
           </div>
         )}
@@ -584,6 +748,8 @@ interface FilterBarProps {
   onAmountMaxChange: (v: number | null) => void
   showTransfers: boolean
   onToggleTransfers: () => void
+  onlyUncategorized: boolean
+  onToggleUncategorized: () => void
   sortKey: string
   onSortChange: (v: string) => void
   accounts: { id: string; name: string }[]
@@ -597,6 +763,7 @@ function FilterBar({
   amountMin, onAmountMinChange,
   amountMax, onAmountMaxChange,
   showTransfers, onToggleTransfers,
+  onlyUncategorized, onToggleUncategorized,
   sortKey, onSortChange,
   accounts,
 }: FilterBarProps): React.JSX.Element {
@@ -640,6 +807,14 @@ function FilterBar({
       <input type="number" placeholder="$ max" value={amountMax ?? ''} onChange={e => onAmountMaxChange(e.target.value ? parseFloat(e.target.value) : null)}
         style={{ ...inputStyle, width: 80, fontFamily: 'var(--font-mono)' }} title="Max amount" />
 
+      {/* Uncategorized toggle */}
+      <button onClick={onToggleUncategorized} style={{
+        background: onlyUncategorized ? 'rgba(155,109,255,0.12)' : 'var(--surface-2)',
+        border: onlyUncategorized ? '1px solid rgba(155,109,255,0.5)' : '1px solid var(--border)',
+        borderRadius: 20, color: onlyUncategorized ? '#9B6DFF' : 'var(--text-muted)',
+        padding: '5px 12px', fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+      }}>Uncategorized</button>
+
       {/* Transfers toggle */}
       <button onClick={onToggleTransfers} style={{
         background: showTransfers ? 'var(--surface-2)' : 'rgba(245,158,11,0.12)',
@@ -667,6 +842,79 @@ export default function Transactions(): React.JSX.Element {
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [noteEditTx, setNoteEditTx] = useState<TransactionRowProps['tx'] | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [pendingRule, setPendingRule] = useState<{ keyword: string; categoryId: string; categoryName: string } | null>(null)
+
+  // Clear selection when filters/page change
+  useEffect(() => { setSelectedIds(new Set()) }, [filters])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(transactions.map(t => t.id)))
+  }, [transactions])
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
+  const selectSimilar = useCallback((description: string) => {
+    const lower = description.toLowerCase()
+    setSelectedIds(new Set(transactions.filter(t => t.description.toLowerCase() === lower).map(t => t.id)))
+  }, [transactions])
+
+  const bulkSetCategory = useCallback(async (catId: string | null) => {
+    if (!selectedIds.size) return
+    const ids = Array.from(selectedIds)
+    await window.db.run(
+      `UPDATE transactions SET category_id = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
+      [catId, ...ids]
+    )
+    setSelectedIds(new Set())
+    refetch()
+  }, [selectedIds, refetch])
+
+  const bulkSetTransfer = useCallback(async (val: 0 | 1) => {
+    if (!selectedIds.size) return
+    const ids = Array.from(selectedIds)
+    await window.db.run(
+      `UPDATE transactions SET is_transfer = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
+      [val, ...ids]
+    )
+    setSelectedIds(new Set())
+    refetch()
+  }, [selectedIds, refetch])
+
+  const handleSuggestRule = useCallback((keyword: string, categoryId: string, categoryName: string) => {
+    setPendingRule({ keyword, categoryId, categoryName })
+  }, [])
+
+  const handleSaveRule = useCallback(async (keyword: string, categoryId: string) => {
+    const k = keyword.trim().toLowerCase()
+    if (!k) return
+    await window.db.run(
+      `INSERT INTO category_rules (id, pattern, category_id, created_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(pattern) DO UPDATE SET category_id = excluded.category_id, created_at = excluded.created_at`,
+      [crypto.randomUUID(), k, categoryId, Date.now()]
+    )
+    setPendingRule(null)
+  }, [])
+
+  const bulkDelete = useCallback(async () => {
+    if (!selectedIds.size) return
+    const ids = Array.from(selectedIds)
+    await window.db.run(
+      `DELETE FROM transactions WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    )
+    setSelectedIds(new Set())
+    refetch()
+  }, [selectedIds, refetch])
 
   // Close menu on outside click
   useEffect(() => {
@@ -709,7 +957,8 @@ export default function Transactions(): React.JSX.Element {
     filters.dateTo !== null ||
     filters.amountMin !== null ||
     filters.amountMax !== null ||
-    !filters.showTransfers
+    !filters.showTransfers ||
+    filters.onlyUncategorized
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -729,10 +978,35 @@ export default function Transactions(): React.JSX.Element {
         onAmountMaxChange={(v) => setFilters({ amountMax: v })}
         showTransfers={filters.showTransfers}
         onToggleTransfers={() => setFilters({ showTransfers: !filters.showTransfers })}
+        onlyUncategorized={filters.onlyUncategorized}
+        onToggleUncategorized={() => setFilters({ onlyUncategorized: !filters.onlyUncategorized })}
         sortKey={sortKey}
         onSortChange={handleSortChange}
         accounts={accounts}
       />
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <BulkActionBar
+          count={selectedIds.size}
+          categories={categories}
+          onSetCategory={bulkSetCategory}
+          onSetTransfer={bulkSetTransfer}
+          onDelete={bulkDelete}
+          onClear={clearSelection}
+        />
+      )}
+
+      {/* Save-as-rule suggestion bar */}
+      {pendingRule && (
+        <PendingRuleBar
+          initialKeyword={pendingRule.keyword}
+          categoryName={pendingRule.categoryName}
+          categoryId={pendingRule.categoryId}
+          onSave={handleSaveRule}
+          onSkip={() => setPendingRule(null)}
+        />
+      )}
 
       {/* Table area */}
       <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -740,7 +1014,7 @@ export default function Transactions(): React.JSX.Element {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '100px 1fr 160px 160px 110px',
+            gridTemplateColumns: COL_TEMPLATE,
             padding: '0 28px',
             position: 'sticky',
             top: 0,
@@ -749,6 +1023,23 @@ export default function Transactions(): React.JSX.Element {
             zIndex: 5,
           }}
         >
+          {/* Select-all checkbox */}
+          <div
+            onClick={() => selectedIds.size === transactions.length ? clearSelection() : selectAll()}
+            style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '8px 0' }}
+          >
+            <div style={{
+              width: 15, height: 15, borderRadius: 4, border: '1px solid var(--border-2)',
+              background: selectedIds.size > 0 && selectedIds.size === transactions.length ? 'var(--accent-2)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {selectedIds.size > 0 && selectedIds.size === transactions.length
+                ? <span style={{ fontSize: 9, color: 'var(--bg)', fontWeight: 700 }}>✓</span>
+                : selectedIds.size > 0
+                  ? <span style={{ fontSize: 9, color: 'var(--accent-2)', fontWeight: 700, lineHeight: 1 }}>–</span>
+                  : null}
+            </div>
+          </div>
           {(['Date', 'Description', 'Account', 'Category', 'Amount'] as const).map((col) => (
             <div
               key={col}
@@ -758,7 +1049,7 @@ export default function Transactions(): React.JSX.Element {
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: 'var(--text-muted)',
-                padding: col === 'Amount' ? '8px 0' : '8px 0',
+                padding: '8px 0',
                 textAlign: col === 'Amount' ? 'right' : 'left',
               }}
             >
@@ -821,6 +1112,10 @@ export default function Transactions(): React.JSX.Element {
               onRefetch={refetch}
               onDelete={() => refetch()}
               onEditNote={(t) => setNoteEditTx(t)}
+              selected={selectedIds.has(tx.id)}
+              onToggleSelect={toggleSelect}
+              onSelectSimilar={selectSimilar}
+              onSuggestRule={handleSuggestRule}
             />
           ))
         )}

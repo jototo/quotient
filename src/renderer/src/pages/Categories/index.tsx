@@ -11,6 +11,13 @@ interface CategoryRow {
   tx_count: number
 }
 
+interface RuleRow {
+  id: string
+  pattern: string
+  category_id: string
+  category_name: string | null
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRESET_COLORS = [
@@ -188,6 +195,7 @@ function EditPanel({ category, onClose, onSaved }: EditPanelProps) {
 
 export default function Categories() {
   const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [rules, setRules] = useState<RuleRow[]>([])
   const [loading, setLoading] = useState(true)
   const [editingCategory, setEditingCategory] = useState<CategoryRow | null | 'new'>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -195,17 +203,31 @@ export default function Categories() {
   const fetchCategories = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await window.db.query(
-        `SELECT c.id, c.name, c.color, c.icon, c.is_system,
-                COUNT(t.id) AS tx_count
-         FROM categories c
-         LEFT JOIN transactions t ON t.category_id = c.id
-         GROUP BY c.id
-         ORDER BY c.is_system DESC, c.name ASC`
-      )
-      setCategories((res.data ?? []) as CategoryRow[])
+      const [catRes, ruleRes] = await Promise.all([
+        window.db.query(
+          `SELECT c.id, c.name, c.color, c.icon, c.is_system,
+                  COUNT(t.id) AS tx_count
+           FROM categories c
+           LEFT JOIN transactions t ON t.category_id = c.id
+           GROUP BY c.id
+           ORDER BY c.is_system DESC, c.name ASC`
+        ),
+        window.db.query(
+          `SELECT r.id, r.pattern, r.category_id, c.name AS category_name
+           FROM category_rules r
+           LEFT JOIN categories c ON r.category_id = c.id
+           ORDER BY r.pattern`
+        ),
+      ])
+      setCategories((catRes.data ?? []) as CategoryRow[])
+      setRules((ruleRes.data ?? []) as RuleRow[])
     } catch (_) { /* ignore */ }
     setLoading(false)
+  }, [])
+
+  const handleDeleteRule = useCallback(async (id: string) => {
+    await window.db.run('DELETE FROM category_rules WHERE id = ?', [id])
+    setRules(prev => prev.filter(r => r.id !== id))
   }, [])
 
   useEffect(() => { fetchCategories() }, [fetchCategories])
@@ -307,6 +329,29 @@ export default function Categories() {
                   {systemCats.map(renderRow)}
                 </>
               )}
+
+              {/* Import Rules */}
+              <div style={{ padding: '20px 24px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--text-muted)', marginTop: 8, borderTop: '1px solid var(--border)' }}>
+                Import Rules ({rules.length})
+              </div>
+              {rules.length === 0 ? (
+                <div style={{ padding: '10px 24px 20px', fontSize: 12, color: 'var(--text-dim)' }}>
+                  No rules yet. Categorize a transaction and click "Save Rule" to remember it for future imports.
+                </div>
+              ) : rules.map(rule => (
+                <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 24px', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--text)', flex: '0 0 auto', minWidth: 120 }}>{rule.pattern}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', flex: '0 0 auto' }}>→</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rule.category_name ?? rule.category_id}</span>
+                  <button
+                    onClick={() => handleDeleteRule(rule.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 16, lineHeight: 1, padding: '2px 4px', borderRadius: 4, flexShrink: 0 }}
+                    title="Delete rule"
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
+                  >×</button>
+                </div>
+              ))}
             </>
           )}
         </div>

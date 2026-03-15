@@ -114,6 +114,13 @@ function initDatabase(): void {
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_import_hash ON transactions(import_hash) WHERE import_hash IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS category_rules (
+      id TEXT PRIMARY KEY,
+      pattern TEXT NOT NULL UNIQUE,
+      category_id TEXT NOT NULL REFERENCES categories(id),
+      created_at INTEGER NOT NULL
+    );
   `)
 
   // Migrations — safe to run on every startup
@@ -296,27 +303,81 @@ function setupIpcHandlers(): void {
   })
 }
 
-function snapshotNetWorth(): void {
-  // Write at most one snapshot per calendar day
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayTs = todayStart.getTime()
-
-  const existing = db.prepare('SELECT id FROM net_worth_history WHERE date = ?').get(todayTs)
-  if (existing) return
-
-  type AccRow = { type: string; balance: number }
-  const accounts = db.prepare('SELECT type, balance FROM accounts WHERE is_hidden = 0').all() as AccRow[]
-  if (accounts.length === 0) return
-
+// Recompute the full net worth history on every startup.
+//
+// Historical months (before this month): one data point per month-start,
+// computed as current_balance − SUM(transactions after that date).
+//
+// Current month: one data point per day up to yesterday, same formula.
+//
+// Today: read live account.balance directly so same-day balance edits are
+// always reflected without waiting for a transaction import.
+//
+// The whole table is rebuilt from scratch so stale rows (written before an
+// account was added or a balance was corrected) are never left behind.
+function refreshNetWorthHistory(): void {
   const LIABILITY_TYPES = ['credit_card', 'loan']
-  const totalAssets      = accounts.filter(a => !LIABILITY_TYPES.includes(a.type)).reduce((s, a) => s + (a.balance ?? 0), 0)
-  const totalLiabilities = accounts.filter(a =>  LIABILITY_TYPES.includes(a.type)).reduce((s, a) => s + Math.abs(a.balance ?? 0), 0)
-  const netWorth         = totalAssets - totalLiabilities
 
-  db.prepare(
+  const getBalancesAt = db.prepare(`
+    SELECT a.type,
+           a.balance - COALESCE(SUM(t.amount), 0) AS balance_at
+    FROM accounts a
+    LEFT JOIN transactions t ON t.account_id = a.id AND t.date > ?
+    WHERE a.is_hidden = 0
+    GROUP BY a.id, a.type, a.balance
+  `)
+
+  function snapAt(ts: number): { assets: number; liabilities: number } | null {
+    const rows = getBalancesAt.all(ts) as { type: string; balance_at: number }[]
+    if (rows.length === 0) return null
+    const assets      = rows.filter(r => !LIABILITY_TYPES.includes(r.type)).reduce((s, r) => s + (r.balance_at ?? 0), 0)
+    const liabilities = rows.filter(r =>  LIABILITY_TYPES.includes(r.type)).reduce((s, r) => s + Math.abs(r.balance_at ?? 0), 0)
+    return { assets, liabilities }
+  }
+
+  const insert = db.prepare(
     'INSERT INTO net_worth_history (id, date, total_assets, total_liabilities, net_worth) VALUES (?, ?, ?, ?, ?)'
-  ).run(randomUUID(), todayTs, totalAssets, totalLiabilities, netWorth)
+  )
+
+  const now = new Date()
+  const todayTs       = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+  const DAY_MS = 86_400_000
+
+  const rebuild = db.transaction(() => {
+    db.prepare('DELETE FROM net_worth_history').run()
+
+    // ── Monthly snapshots for completed months ─────────────────────────────
+    const oldest = db.prepare('SELECT MIN(date) AS d FROM transactions').get() as { d: number | null }
+    if (oldest?.d) {
+      const cursor = new Date(oldest.d)
+      cursor.setDate(1); cursor.setHours(0, 0, 0, 0)
+      while (cursor.getTime() < thisMonthStart) {
+        const ts = cursor.getTime()
+        const s = snapAt(ts)
+        if (s) insert.run(randomUUID(), ts, s.assets, s.liabilities, s.assets - s.liabilities)
+        cursor.setMonth(cursor.getMonth() + 1)
+      }
+    }
+
+    // ── Daily snapshots for the current month up to (not including) today ──
+    let day = thisMonthStart
+    while (day < todayTs) {
+      const s = snapAt(day)
+      if (s) insert.run(randomUUID(), day, s.assets, s.liabilities, s.assets - s.liabilities)
+      day += DAY_MS
+    }
+
+    // ── Today: live account balances (reflects manual balance edits too) ───
+    const live = db.prepare('SELECT type, balance FROM accounts WHERE is_hidden = 0').all() as { type: string; balance: number }[]
+    if (live.length > 0) {
+      const assets      = live.filter(a => !LIABILITY_TYPES.includes(a.type)).reduce((s, a) => s + (a.balance ?? 0), 0)
+      const liabilities = live.filter(a =>  LIABILITY_TYPES.includes(a.type)).reduce((s, a) => s + Math.abs(a.balance ?? 0), 0)
+      insert.run(randomUUID(), todayTs, assets, liabilities, assets - liabilities)
+    }
+  })
+
+  rebuild()
 }
 
 function setupSettingsHandlers(): void {
@@ -429,8 +490,8 @@ app.whenReady().then(() => {
   setupIpcHandlers()
   setupSettingsHandlers()
 
-  // Write today's net worth snapshot (once per day)
-  snapshotNetWorth()
+  // Rebuild net worth history from transaction data + live account balances
+  refreshNetWorthHistory()
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

@@ -73,9 +73,18 @@ export default function ImportModal() {
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, step, close])
 
-  const handleConfirmMapping = useCallback((m: ColumnMapping, accountId: string, shouldClear: boolean) => {
+  const handleConfirmMapping = useCallback(async (m: ColumnMapping, accountId: string, shouldClear: boolean) => {
     setClearFirst(shouldClear)
-    const { rows, errorCount } = transformRows(rawRows, m, accountId, categorize)
+    // Load user-defined rules — they take priority over the built-in categorizer
+    const rulesRes = await window.db.query('SELECT pattern, category_id FROM category_rules')
+    const userRules = (rulesRes.data ?? []) as { pattern: string; category_id: string }[]
+    const categorizeFn = (desc: string): string | null => {
+      const lower = desc.toLowerCase()
+      const match = userRules.find(r => lower.includes(r.pattern.toLowerCase()))
+      if (match) return match.category_id
+      return categorize(desc)
+    }
+    const { rows, errorCount } = transformRows(rawRows, m, accountId, categorizeFn)
     setImportRows(rows)
     setParseErrorCount(errorCount)
     setSelectedAccountId(accountId)
