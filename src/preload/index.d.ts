@@ -1,4 +1,4 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
+export {}
 
 interface DbResult<T = unknown> {
   data: T | null
@@ -28,7 +28,6 @@ interface ImportResult {
 
 declare global {
   interface Window {
-    electron: ElectronAPI
     db: DbAPI
     dialog: {
       openAndReadCSV: () => Promise<{ data: string | null; fileName: string | null; error: string | null }>

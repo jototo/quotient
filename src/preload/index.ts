@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
 
 // Database API exposed to renderer
 const dbAPI = {
@@ -27,7 +26,6 @@ const appAPI = {
 }
 
 // contextIsolation is always enabled — no unsafe fallback
-contextBridge.exposeInMainWorld('electron', electronAPI)
 contextBridge.exposeInMainWorld('db', dbAPI)
 contextBridge.exposeInMainWorld('dialog', dialogAPI)
 contextBridge.exposeInMainWorld('csv', csvAPI)
