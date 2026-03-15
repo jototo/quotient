@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs'
 import { randomUUID } from 'crypto'
 import icon from '../../resources/icon.png?asset'
 
@@ -295,6 +295,67 @@ function setupIpcHandlers(): void {
   })
 }
 
+function setupSettingsHandlers(): void {
+  ipcMain.handle('app:getInfo', () => {
+    return {
+      version: app.getVersion(),
+      dataPath: app.getPath('userData'),
+    }
+  })
+
+  // Export all transactions to a user-chosen CSV file
+  ipcMain.handle('app:exportCSV', async () => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: `quotient-export-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+    })
+    if (result.canceled || !result.filePath) return { error: null, canceled: true }
+    try {
+      type TxRow = {
+        date: number; description: string; amount: number;
+        account_name: string; category_name: string | null; notes: string | null; is_transfer: number
+      }
+      const rows = db.prepare(`
+        SELECT t.date, t.description, t.amount, a.name AS account_name,
+               c.name AS category_name, t.notes, t.is_transfer
+        FROM transactions t
+        JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        ORDER BY t.date DESC
+      `).all() as TxRow[]
+
+      const header = 'Date,Description,Amount,Account,Category,Notes,Transfer\n'
+      const lines = rows.map(r => {
+        const date = new Date(r.date).toISOString().slice(0, 10)
+        const esc = (s: string | null) => s ? `"${String(s).replace(/"/g, '""')}"` : ''
+        return [date, esc(r.description), r.amount.toFixed(2), esc(r.account_name), esc(r.category_name), esc(r.notes), r.is_transfer ? '1' : '0'].join(',')
+      }).join('\n')
+      writeFileSync(result.filePath, header + lines, 'utf-8')
+      return { error: null, canceled: false, count: rows.length }
+    } catch (e) {
+      return { error: (e as Error).message, canceled: false }
+    }
+  })
+
+  // List auto-backup files written by clearTransactions
+  ipcMain.handle('backup:list', () => {
+    try {
+      const dataPath = app.getPath('userData')
+      const files = readdirSync(dataPath)
+        .filter(f => f.startsWith('transactions-backup-') && f.endsWith('.json'))
+        .map(f => {
+          const full = join(dataPath, f)
+          const stat = statSync(full)
+          return { name: f, size: stat.size, createdAt: stat.birthtimeMs }
+        })
+        .sort((a, b) => b.createdAt - a.createdAt)
+      return { data: files, error: null }
+    } catch (e) {
+      return { data: [], error: (e as Error).message }
+    }
+  })
+}
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -342,6 +403,7 @@ app.whenReady().then(() => {
 
   // Set up IPC handlers
   setupIpcHandlers()
+  setupSettingsHandlers()
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

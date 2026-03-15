@@ -39,5 +39,10 @@ declare global {
     data: {
       clearTransactions: (accountId?: string) => Promise<{ data: boolean | null; error: string | null }>
     }
+    appAPI: {
+      getInfo: () => Promise<{ version: string; dataPath: string }>
+      exportCSV: () => Promise<{ error: string | null; canceled: boolean; count?: number }>
+      listBackups: () => Promise<{ data: { name: string; size: number; createdAt: number }[]; error: string | null }>
+    }
   }
 }

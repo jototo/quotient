@@ -8,6 +8,7 @@ import Budget from './pages/Budget'
 import Recurring from './pages/Recurring'
 import Goals from './pages/Goals'
 import Investments from './pages/Investments'
+import Settings from './pages/Settings'
 
 function App(): React.JSX.Element {
   return (
@@ -22,6 +23,7 @@ function App(): React.JSX.Element {
           <Route path="recurring" element={<Recurring />} />
           <Route path="goals" element={<Goals />} />
           <Route path="investments" element={<Investments />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </HashRouter>
