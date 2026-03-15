@@ -9,6 +9,7 @@ import Recurring from './pages/Recurring'
 import Goals from './pages/Goals'
 import Investments from './pages/Investments'
 import Settings from './pages/Settings'
+import Categories from './pages/Categories'
 
 function App(): React.JSX.Element {
   return (
@@ -23,6 +24,7 @@ function App(): React.JSX.Element {
           <Route path="recurring" element={<Recurring />} />
           <Route path="goals" element={<Goals />} />
           <Route path="investments" element={<Investments />} />
+          <Route path="categories" element={<Categories />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

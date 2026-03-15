@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ImportProvider, useImport } from '@renderer/context/ImportContext'
 import ImportModal from '@renderer/components/ImportModal'
@@ -70,6 +70,18 @@ const navGroups: NavGroup[] = [
             <path d="M2 6h12M6 6v8" />
           </svg>
         )
+      },
+      {
+        path: '/categories',
+        label: 'Categories',
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" width={15} height={15}>
+            <circle cx="5" cy="5" r="2.5" />
+            <circle cx="11" cy="5" r="2.5" />
+            <circle cx="5" cy="11" r="2.5" />
+            <circle cx="11" cy="11" r="2.5" />
+          </svg>
+        )
       }
     ]
   },
@@ -139,6 +151,17 @@ function LayoutInner(): React.JSX.Element {
   const location = useLocation()
   const { section, title } = getPageInfo(location.pathname)
   const { open: openImport } = useImport()
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.metaKey && e.key === 'i') {
+        e.preventDefault()
+        openImport()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [openImport])
 
   return (
     <div

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { formatCurrency, formatMonthLabel } from '@renderer/utils/formatters'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +50,12 @@ function AddBudgetModal({ categories, existingCategoryIds, onClose, onCreated }:
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   async function handleCreate() {
     if (!categoryId) { setError('Please select a category'); return }
@@ -265,6 +271,19 @@ export default function Budget() {
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const modalOpenRef = useRef(false)
+  modalOpenRef.current = showAddModal
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (modalOpenRef.current) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowLeft') setMonthOffset(o => o - 1)
+      else if (e.key === 'ArrowRight') setMonthOffset(o => Math.min(o + 1, 0))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)

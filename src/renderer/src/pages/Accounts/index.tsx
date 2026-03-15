@@ -138,6 +138,12 @@ function AddAccountModal({ onClose, onCreated }: AddAccountModalProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function handleCreate() {
     if (!name.trim()) { setError('Name is required'); return }
     const bal = parseFloat(balance)
@@ -256,6 +262,15 @@ function EditAccountPanel({ account, onClose, onSaved }: EditAccountPanelProps) 
     onSaved()
   }
 
+  async function handleRecalcBalance() {
+    const res = await window.db.query(
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE account_id = ?',
+      [account.id]
+    )
+    const total = ((res.data?.[0] ?? { total: 0 }) as { total: number }).total
+    setBalance(String(Math.round(total * 100) / 100))
+  }
+
   async function handleDelete() {
     if (deleteStep === 'idle') { setDeleteStep('confirm'); return }
     // Delete transactions first, then account
@@ -319,6 +334,13 @@ function EditAccountPanel({ account, onClose, onSaved }: EditAccountPanelProps) 
                 style={{ ...inputStyle, fontFamily: 'var(--font-mono)', paddingLeft: 22 }}
               />
             </div>
+            <button
+              onClick={handleRecalcBalance}
+              style={{ marginTop: 6, padding: '5px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 11.5 }}
+              title="Set balance to the sum of all transactions for this account"
+            >
+              ↻ Recalculate from transactions
+            </button>
           </div>
         </div>
 

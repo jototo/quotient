@@ -65,6 +65,14 @@ export default function ImportModal() {
     openCSVFile()
   }, [isOpen])
 
+  // Escape to close (not during active file loading)
+  useEffect(() => {
+    if (!isOpen || step === 'loading') return
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') close() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isOpen, step, close])
+
   const handleConfirmMapping = useCallback((m: ColumnMapping, accountId: string, shouldClear: boolean) => {
     setClearFirst(shouldClear)
     const { rows, errorCount } = transformRows(rawRows, m, accountId, categorize)

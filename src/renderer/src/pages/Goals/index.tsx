@@ -85,6 +85,12 @@ function GoalForm({ accounts, initial, onClose, onSaved }: GoalFormProps) {
   const [error, setError]           = useState<string | null>(null)
   const [saving, setSaving]         = useState(false)
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function handleSave() {
     if (!name.trim()) { setError('Name is required'); return }
     const target = parseFloat(targetAmount)
@@ -210,6 +216,12 @@ function ContributeModal({ goal, onClose, onSaved }: { goal: Goal; onClose: () =
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
   const remaining = goal.target_amount - goal.current_amount
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
   const presets = [
     Math.round(remaining * 0.1),
     Math.round(remaining * 0.25),

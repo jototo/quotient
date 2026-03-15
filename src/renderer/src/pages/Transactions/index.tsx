@@ -136,6 +136,63 @@ function CategoryCell({
   )
 }
 
+// ─── Note edit modal ───────────────────────────────────────────────────────────
+
+interface NoteEditModalProps {
+  tx: { id: string; description: string; notes: string | null }
+  onClose: () => void
+  onSaved: () => void
+}
+
+function NoteEditModal({ tx, onClose, onSaved }: NoteEditModalProps): React.JSX.Element {
+  const [note, setNote] = useState(tx.notes ?? '')
+
+  const handleSave = async (): Promise<void> => {
+    await window.db.run('UPDATE transactions SET notes = ? WHERE id = ?', [note.trim() || null, tx.id])
+    onSaved()
+    onClose()
+  }
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(7,11,18,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Edit Note</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tx.description}</div>
+        <textarea
+          autoFocus
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Add a note…"
+          rows={3}
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: 7, border: '1px solid var(--border-2)',
+            background: 'var(--surface-2)', color: 'var(--text)', fontFamily: 'var(--font-ui)',
+            fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+          <button onClick={onClose} style={{ padding: '7px 16px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13 }}>Cancel</button>
+          <button onClick={handleSave} style={{ padding: '7px 16px', borderRadius: 7, border: 'none', background: 'var(--accent)', color: 'var(--bg)', cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600 }}>Save Note</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Row menu ──────────────────────────────────────────────────────────────────
 
 interface RowMenuProps {
@@ -144,6 +201,8 @@ interface RowMenuProps {
   openMenuId: string | null
   setOpenMenuId: (id: string | null) => void
   onAction: () => void
+  onDelete: () => void
+  onEditNote: () => void
 }
 
 function RowMenu({
@@ -152,13 +211,17 @@ function RowMenu({
   openMenuId,
   setOpenMenuId,
   onAction,
+  onDelete,
+  onEditNote,
 }: RowMenuProps): React.JSX.Element {
   const isOpen = openMenuId === txId
+  const [deleteStep, setDeleteStep] = useState<'idle' | 'confirm'>('idle')
   const btnRef = useRef<HTMLButtonElement>(null)
 
   const handleToggle = (e: React.MouseEvent): void => {
     e.stopPropagation()
-    setOpenMenuId(isOpen ? null : txId)
+    if (isOpen) { setOpenMenuId(null); setDeleteStep('idle') }
+    else setOpenMenuId(txId)
   }
 
   const handleMarkTransfer = async (e: React.MouseEvent): Promise<void> => {
@@ -169,21 +232,35 @@ function RowMenu({
     onAction()
   }
 
+  const handleDelete = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation()
+    if (deleteStep === 'idle') { setDeleteStep('confirm'); return }
+    await window.db.run('DELETE FROM transactions WHERE id = ?', [txId])
+    setOpenMenuId(null)
+    onDelete()
+  }
+
+  const handleEditNote = (e: React.MouseEvent): void => {
+    e.stopPropagation()
+    setOpenMenuId(null)
+    onEditNote()
+  }
+
+  const menuBtnStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+    background: 'transparent', border: 'none', color: 'var(--text)', cursor: 'pointer',
+    padding: '10px 14px', fontFamily: 'var(--font-ui)', fontSize: 13, textAlign: 'left',
+  }
+
   return (
     <div style={{ position: 'relative', display: 'inline-flex' }}>
       <button
         ref={btnRef}
         onClick={handleToggle}
         style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-muted)',
-          cursor: 'pointer',
-          padding: '2px 6px',
-          borderRadius: 4,
-          fontSize: 16,
-          lineHeight: 1,
-          fontFamily: 'var(--font-mono)',
+          background: 'transparent', border: 'none', color: 'var(--text-muted)',
+          cursor: 'pointer', padding: '2px 6px', borderRadius: 4, fontSize: 16,
+          lineHeight: 1, fontFamily: 'var(--font-mono)',
         }}
         title="Row actions"
       >
@@ -192,50 +269,41 @@ function RowMenu({
       {isOpen && (
         <div
           style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border-2)',
-            borderRadius: 8,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            zIndex: 100,
-            minWidth: 180,
-            overflow: 'hidden',
+            position: 'absolute', top: '100%', right: 0,
+            background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+            borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            zIndex: 100, minWidth: 190, overflow: 'hidden',
           }}
         >
           <button
             onClick={handleMarkTransfer}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text)',
-              cursor: 'pointer',
-              padding: '10px 14px',
-              fontFamily: 'var(--font-ui)',
-              fontSize: 13,
-              textAlign: 'left',
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-3)'
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            }}
+            style={menuBtnStyle}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-3)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
           >
             {isTransfer ? (
-              <>
-                <span style={{ fontSize: 14 }}>✓</span> Mark as expense
-              </>
+              <><span style={{ fontSize: 14 }}>✓</span> Mark as expense</>
             ) : (
-              <>
-                <span style={{ fontSize: 14 }}>↔</span> Mark as transfer
-              </>
+              <><span style={{ fontSize: 14 }}>↔</span> Mark as transfer</>
             )}
+          </button>
+          <button
+            onClick={handleEditNote}
+            style={menuBtnStyle}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-3)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+          >
+            <span style={{ fontSize: 13 }}>✎</span> Edit note
+          </button>
+          <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+          <button
+            onClick={handleDelete}
+            style={{ ...menuBtnStyle, color: deleteStep === 'confirm' ? 'white' : 'var(--red)', background: deleteStep === 'confirm' ? 'var(--red)' : 'transparent', fontWeight: deleteStep === 'confirm' ? 600 : 400 }}
+            onMouseEnter={(e) => { if (deleteStep !== 'confirm') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,77,114,0.08)' }}
+            onMouseLeave={(e) => { if (deleteStep !== 'confirm') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+          >
+            <span style={{ fontSize: 13 }}>🗑</span>
+            {deleteStep === 'confirm' ? 'Confirm delete' : 'Delete'}
           </button>
         </div>
       )}
@@ -258,11 +326,14 @@ interface TransactionRowProps {
     category_id: string | null
     category_name: string | null
     category_color: string | null
+    notes: string | null
   }
   categories: CategoryOption[]
   openMenuId: string | null
   setOpenMenuId: (id: string | null) => void
   onRefetch: () => void
+  onDelete: (id: string) => void
+  onEditNote: (tx: TransactionRowProps['tx']) => void
 }
 
 function TxRow({
@@ -271,6 +342,8 @@ function TxRow({
   openMenuId,
   setOpenMenuId,
   onRefetch,
+  onDelete,
+  onEditNote,
 }: TransactionRowProps): React.JSX.Element {
   const [hovered, setHovered] = useState(false)
 
@@ -298,7 +371,7 @@ function TxRow({
         gridTemplateColumns: '100px 1fr 160px 160px 110px',
         alignItems: 'center',
         padding: '0 28px',
-        height: 48,
+        minHeight: 48,
         borderBottom: '1px solid var(--border)',
         background: hovered ? 'var(--surface-2)' : 'transparent',
         opacity: tx.is_transfer ? 0.5 : 1,
@@ -319,21 +392,27 @@ function TxRow({
       </div>
 
       {/* Description */}
-      <div
-        style={{
-          fontSize: 13.5,
-          fontWeight: 500,
-          color: 'var(--text)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          paddingRight: hovered ? 40 : 12,
-        }}
-      >
-        {tx.is_transfer ? (
-          <span style={{ color: 'var(--text-dim)', marginRight: 6 }}>↔</span>
-        ) : null}
-        {tx.description}
+      <div style={{ overflow: 'hidden', paddingRight: hovered ? 40 : 12 }}>
+        <div
+          style={{
+            fontSize: 13.5,
+            fontWeight: 500,
+            color: 'var(--text)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {tx.is_transfer ? (
+            <span style={{ color: 'var(--text-dim)', marginRight: 6 }}>↔</span>
+          ) : null}
+          {tx.description}
+        </div>
+        {tx.notes && (
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+            {tx.notes}
+          </div>
+        )}
       </div>
 
       {/* Account */}
@@ -382,6 +461,8 @@ function TxRow({
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
               onAction={onRefetch}
+              onDelete={() => onDelete(tx.id)}
+              onEditNote={() => onEditNote(tx)}
             />
           </div>
         )}
@@ -585,6 +666,7 @@ export default function Transactions(): React.JSX.Element {
   const { accounts } = useAccounts()
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [noteEditTx, setNoteEditTx] = useState<TransactionRowProps['tx'] | null>(null)
 
   // Close menu on outside click
   useEffect(() => {
@@ -737,10 +819,21 @@ export default function Transactions(): React.JSX.Element {
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
               onRefetch={refetch}
+              onDelete={() => refetch()}
+              onEditNote={(t) => setNoteEditTx(t)}
             />
           ))
         )}
       </div>
+
+      {/* Note edit modal */}
+      {noteEditTx && (
+        <NoteEditModal
+          tx={noteEditTx}
+          onClose={() => setNoteEditTx(null)}
+          onSaved={refetch}
+        />
+      )}
 
       {/* Pagination footer */}
       {totalCount > 50 && (

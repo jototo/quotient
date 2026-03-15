@@ -122,6 +122,12 @@ function ItemForm({ accounts, categories, initial, onClose, onSaved }: ItemFormP
   const [error, setError]             = useState<string | null>(null)
   const [saving, setSaving]           = useState(false)
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function handleSave() {
     if (!name.trim()) { setError('Name is required'); return }
     const amt = parseFloat(amount)
@@ -256,24 +262,41 @@ function ItemForm({ accounts, categories, initial, onClose, onSaved }: ItemFormP
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+interface RecentTx { id: string; description: string; amount: number; date: number }
+
+function matchRecurring(itemName: string, txDesc: string): boolean {
+  const keywords = itemName.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+  const desc = txDesc.toLowerCase()
+  return keywords.length > 0 && keywords.some(w => desc.includes(w))
+}
+
 export default function Recurring() {
   const [items, setItems]         = useState<RecurringItem[]>([])
   const [accounts, setAccounts]   = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [recentTxs, setRecentTxs] = useState<RecentTx[]>([])
   const [tab, setTab]             = useState<FilterTab>('all')
   const [showAdd, setShowAdd]     = useState(false)
   const [editItem, setEditItem]   = useState<RecurringItem | null>(null)
   const [showInactive, setShowInactive] = useState(false)
 
   const load = useCallback(async () => {
-    const [itemsRes, accRes, catRes] = await Promise.all([
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime()
+    const [itemsRes, accRes, catRes, txRes] = await Promise.all([
       window.db.query('SELECT * FROM recurring_items ORDER BY is_active DESC, next_due_date ASC'),
       window.db.query('SELECT id, name FROM accounts WHERE is_hidden = 0 ORDER BY name'),
       window.db.query('SELECT id, name, color FROM categories ORDER BY name'),
+      window.db.query(
+        'SELECT id, description, amount, date FROM transactions WHERE date >= ? AND date < ? AND COALESCE(is_transfer,0)=0 ORDER BY date DESC',
+        [monthStart, monthEnd]
+      ),
     ])
     if (itemsRes.data) setItems(itemsRes.data as RecurringItem[])
     if (accRes.data)   setAccounts(accRes.data as Account[])
     if (catRes.data)   setCategories(catRes.data as Category[])
+    if (txRes.data)    setRecentTxs(txRes.data as RecentTx[])
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -398,6 +421,7 @@ export default function Recurring() {
             const acc  = item.account_id  ? accMap[item.account_id]  : null
             const monthlyAmt = toMonthly(Math.abs(item.amount), item.frequency)
             const isIncome = item.type === 'income'
+            const matchedTx = recentTxs.find(tx => matchRecurring(item.name, tx.description))
 
             return (
               <div key={item.id} style={{
@@ -432,6 +456,13 @@ export default function Recurring() {
                     {item.last_paid_date && (
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
                         · paid {new Date(item.last_paid_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                    {matchedTx && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--green)', padding: '1px 5px', borderRadius: 3, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
+                        title={`Matched: ${matchedTx.description}`}
+                      >
+                        ✓ {new Date(matchedTx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {formatCurrency(Math.abs(matchedTx.amount))}
                       </span>
                     )}
                   </div>

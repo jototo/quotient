@@ -82,6 +82,12 @@ function HoldingForm({ accounts, initial, onClose, onSaved }: HoldingFormProps) 
   const [error, setError]           = useState<string | null>(null)
   const [saving, setSaving]         = useState(false)
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function handleSave() {
     if (!ticker.trim()) { setError('Ticker is required'); return }
     const sharesN = parseFloat(shares)

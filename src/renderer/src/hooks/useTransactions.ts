@@ -25,6 +25,7 @@ export interface TransactionRecord {
   category_id: string | null
   category_name: string | null
   category_color: string | null
+  notes: string | null
 }
 
 export interface UseTransactionsResult {
@@ -122,7 +123,8 @@ export function useTransactions(): UseTransactionsResult {
              a.name AS account_name,
              t.category_id,
              c.name AS category_name,
-             c.color AS category_color
+             c.color AS category_color,
+             t.notes
       FROM transactions t
       LEFT JOIN accounts a ON t.account_id = a.id
       LEFT JOIN categories c ON t.category_id = c.id
