@@ -5,8 +5,12 @@ const TYPE_COLOR: Record<string, string> = {
   investment: '#3D8EFF',
   checking: '#00C9A7',
   savings: '#00C9A7',
+  '401k': '#00C9A7',
+  ira: '#00C9A7',
+  hsa: '#10B981',
   real_estate: '#9B6DFF',
   vehicle: '#F59E0B',
+  personal_property: '#EC4899',
   other: '#4E6080',
 }
 
@@ -14,8 +18,12 @@ const TYPE_LABEL: Record<string, string> = {
   investment: 'Investments',
   checking: 'Cash',
   savings: 'Cash',
+  '401k': 'Retirement',
+  ira: 'Retirement',
+  hsa: 'HSA',
   real_estate: 'Real Estate',
   vehicle: 'Vehicles',
+  personal_property: 'Personal Property',
   other: 'Other',
 }
 

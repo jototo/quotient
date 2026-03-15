@@ -29,7 +29,7 @@ interface GroupedAsset {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TYPE_ORDER = ['checking', 'savings', 'credit_card', 'investment', '401k', 'ira', 'real_estate', 'vehicle', 'personal_property', 'loan', 'other']
+const TYPE_ORDER = ['checking', 'savings', 'credit_card', 'investment', '401k', 'ira', 'hsa', 'real_estate', 'vehicle', 'personal_property', 'loan', 'other']
 
 const TYPE_GROUP: Record<string, string> = {
   checking: 'Cash',
@@ -38,6 +38,7 @@ const TYPE_GROUP: Record<string, string> = {
   investment: 'Investments',
   '401k': 'Retirement',
   ira: 'Retirement',
+  hsa: 'HSA',
   real_estate: 'Real Estate',
   vehicle: 'Vehicles',
   personal_property: 'Personal Property',
@@ -50,6 +51,7 @@ const TYPE_ICON: Record<string, string> = {
   'Credit Cards': '💳',
   Investments: '📈',
   Retirement: '🏖️',
+  HSA: '🏥',
   'Real Estate': '🏠',
   Vehicles: '🚗',
   'Personal Property': '💎',
@@ -64,6 +66,7 @@ const TYPE_GRADIENT: Record<string, string> = {
   investment: 'linear-gradient(135deg, #9B6DFF, #3D8EFF)',
   '401k': 'linear-gradient(135deg, #00C9A7, #3D8EFF)',
   ira: 'linear-gradient(135deg, #00C9A7, #3D8EFF)',
+  hsa: 'linear-gradient(135deg, #10B981, #06B6D4)',
   real_estate: 'linear-gradient(135deg, #9B6DFF, #FF4D72)',
   vehicle: 'linear-gradient(135deg, #F59E0B, #FF4D72)',
   personal_property: 'linear-gradient(135deg, #EC4899, #9B6DFF)',
@@ -75,6 +78,7 @@ const ASSET_TYPE_COLOR: Record<string, string> = {
   investment: '#3D8EFF',
   '401k': '#00C9A7',
   ira: '#00C9A7',
+  hsa: '#10B981',
   checking: '#00C9A7',
   savings: '#00C9A7',
   real_estate: '#9B6DFF',
@@ -87,6 +91,7 @@ const ASSET_TYPE_LABEL: Record<string, string> = {
   investment: 'Investments',
   '401k': 'Retirement',
   ira: 'Retirement',
+  hsa: 'HSA',
   checking: 'Cash',
   savings: 'Cash',
   real_estate: 'Real Estate',
@@ -95,7 +100,7 @@ const ASSET_TYPE_LABEL: Record<string, string> = {
   other: 'Other',
 }
 
-const ACCOUNT_TYPES = ['checking', 'savings', 'credit_card', 'investment', '401k', 'ira', 'real_estate', 'vehicle', 'personal_property', 'loan', 'other']
+const ACCOUNT_TYPES = ['checking', 'savings', 'credit_card', 'investment', '401k', 'ira', 'hsa', 'real_estate', 'vehicle', 'personal_property', 'loan', 'other']
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

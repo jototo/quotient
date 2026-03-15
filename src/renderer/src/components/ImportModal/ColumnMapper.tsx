@@ -19,6 +19,7 @@ const ACCOUNT_TYPES = [
   { value: 'investment',       label: 'Investment' },
   { value: '401k',             label: '401(k)' },
   { value: 'ira',              label: 'IRA' },
+  { value: 'hsa',              label: 'HSA' },
   { value: 'real_estate',      label: 'Real Estate' },
   { value: 'vehicle',          label: 'Vehicle' },
   { value: 'personal_property',label: 'Personal Property' },
