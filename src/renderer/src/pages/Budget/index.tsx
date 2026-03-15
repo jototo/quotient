@@ -11,6 +11,7 @@ interface BudgetRow {
   category_name: string
   category_color: string | null
   spent: number
+  prev_spent: number
 }
 
 interface CategoryOption {
@@ -226,9 +227,21 @@ function BudgetCard({ budget, hovered, onMouseEnter, onMouseLeave, onDelete, onU
         }} />
       </div>
 
-      {/* Row 3: percentage + remaining/over */}
+      {/* Row 3: percentage + remaining/over + mom delta */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 11.5, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{pct.toFixed(1)}%</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 11.5, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{pct.toFixed(1)}%</span>
+          {budget.prev_spent > 0 && (() => {
+            const delta = budget.spent - budget.prev_spent
+            const deltaPct = (delta / budget.prev_spent) * 100
+            const up = delta > 0
+            return (
+              <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: up ? 'var(--red)' : 'var(--green)' }}>
+                {up ? '▲' : '▼'} {Math.abs(deltaPct).toFixed(0)}% vs last mo
+              </span>
+            )
+          })()}
+        </div>
         {over ? (
           <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--red)', fontWeight: 600 }}>
             OVER {formatCurrency(Math.abs(remaining))}
@@ -256,19 +269,21 @@ export default function Budget() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [start, end] = monthBounds(monthOffset)
+    const [prevStart, prevEnd] = monthBounds(monthOffset - 1)
     try {
       const [budgetRes, catRes] = await Promise.all([
         window.db.query(
           `SELECT b.id, b.amount AS budget_amount, b.period,
                   c.id AS category_id, c.name AS category_name, c.color AS category_color,
-                  COALESCE(SUM(CASE WHEN t.amount < 0 AND t.date >= ? AND t.date < ? AND COALESCE(t.is_transfer,0)=0 THEN ABS(t.amount) ELSE 0 END), 0) AS spent
+                  COALESCE(SUM(CASE WHEN t.amount < 0 AND t.date >= ? AND t.date < ? AND COALESCE(t.is_transfer,0)=0 THEN ABS(t.amount) ELSE 0 END), 0) AS spent,
+                  COALESCE(SUM(CASE WHEN t.amount < 0 AND t.date >= ? AND t.date < ? AND COALESCE(t.is_transfer,0)=0 THEN ABS(t.amount) ELSE 0 END), 0) AS prev_spent
            FROM budgets b
            JOIN categories c ON b.category_id = c.id
            LEFT JOIN transactions t ON t.category_id = b.category_id
            WHERE b.period = 'monthly'
            GROUP BY b.id
            ORDER BY c.name`,
-          [start, end]
+          [start, end, prevStart, prevEnd]
         ),
         window.db.query('SELECT id, name, color FROM categories ORDER BY name'),
       ])

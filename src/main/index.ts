@@ -118,6 +118,7 @@ function initDatabase(): void {
 
   // Migrations — safe to run on every startup
   try { db.exec('ALTER TABLE transactions ADD COLUMN is_transfer INTEGER DEFAULT 0') } catch { /* already exists */ }
+  try { db.exec('ALTER TABLE recurring_items ADD COLUMN last_paid_date INTEGER') } catch { /* already exists */ }
 
   // Seed system categories with stable IDs
   const seedCategories = db.prepare(`
@@ -295,6 +296,29 @@ function setupIpcHandlers(): void {
   })
 }
 
+function snapshotNetWorth(): void {
+  // Write at most one snapshot per calendar day
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayTs = todayStart.getTime()
+
+  const existing = db.prepare('SELECT id FROM net_worth_history WHERE date = ?').get(todayTs)
+  if (existing) return
+
+  type AccRow = { type: string; balance: number }
+  const accounts = db.prepare('SELECT type, balance FROM accounts WHERE is_hidden = 0').all() as AccRow[]
+  if (accounts.length === 0) return
+
+  const LIABILITY_TYPES = ['credit_card', 'loan']
+  const totalAssets      = accounts.filter(a => !LIABILITY_TYPES.includes(a.type)).reduce((s, a) => s + (a.balance ?? 0), 0)
+  const totalLiabilities = accounts.filter(a =>  LIABILITY_TYPES.includes(a.type)).reduce((s, a) => s + Math.abs(a.balance ?? 0), 0)
+  const netWorth         = totalAssets - totalLiabilities
+
+  db.prepare(
+    'INSERT INTO net_worth_history (id, date, total_assets, total_liabilities, net_worth) VALUES (?, ?, ?, ?, ?)'
+  ).run(randomUUID(), todayTs, totalAssets, totalLiabilities, netWorth)
+}
+
 function setupSettingsHandlers(): void {
   ipcMain.handle('app:getInfo', () => {
     return {
@@ -404,6 +428,9 @@ app.whenReady().then(() => {
   // Set up IPC handlers
   setupIpcHandlers()
   setupSettingsHandlers()
+
+  // Write today's net worth snapshot (once per day)
+  snapshotNetWorth()
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

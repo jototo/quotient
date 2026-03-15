@@ -403,15 +403,104 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
+// ─── Multi-account dropdown ───────────────────────────────────────────────────
+
+function AccountMultiSelect({ accounts, selected, onChange }: {
+  accounts: { id: string; name: string }[]
+  selected: string[]
+  onChange: (ids: string[]) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const toggle = (id: string) => {
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id])
+  }
+
+  const label = selected.length === 0
+    ? 'All accounts'
+    : selected.length === 1
+      ? (accounts.find(a => a.id === selected[0])?.name ?? '1 account')
+      : `${selected.length} accounts`
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        ...inputStyle,
+        display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+        background: selected.length > 0 ? 'rgba(61,142,255,0.08)' : 'var(--surface-2)',
+        borderColor: selected.length > 0 ? 'rgba(61,142,255,0.4)' : 'var(--border)',
+        color: selected.length > 0 ? 'var(--accent-2)' : 'var(--text)',
+        whiteSpace: 'nowrap',
+      }}>
+        {label}
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 2 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50,
+          background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+          borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          minWidth: 180, overflow: 'hidden',
+        }}>
+          {selected.length > 0 && (
+            <button onClick={() => onChange([])} style={{
+              width: '100%', padding: '8px 14px', background: 'transparent', border: 'none',
+              borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 11.5,
+              fontFamily: 'var(--font-mono)', cursor: 'pointer', textAlign: 'left',
+            }}>Clear selection</button>
+          )}
+          {accounts.map(a => (
+            <button key={a.id} onClick={() => toggle(a.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+              padding: '9px 14px', background: 'transparent', border: 'none',
+              color: 'var(--text)', fontSize: 13, fontFamily: 'var(--font-ui)',
+              cursor: 'pointer', textAlign: 'left',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-3)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <div style={{
+                width: 14, height: 14, borderRadius: 3, flexShrink: 0, border: '1px solid',
+                borderColor: selected.includes(a.id) ? 'var(--accent-2)' : 'var(--border)',
+                background: selected.includes(a.id) ? 'var(--accent-2)' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {selected.includes(a.id) && <span style={{ fontSize: 9, color: 'var(--bg)', fontWeight: 700 }}>✓</span>}
+              </div>
+              {a.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Filter bar ───────────────────────────────────────────────────────────────
+
 interface FilterBarProps {
   search: string
   onSearchChange: (v: string) => void
-  accountId: string
-  onAccountChange: (v: string) => void
+  accountIds: string[]
+  onAccountsChange: (v: string[]) => void
   dateFrom: number | null
   onDateFromChange: (v: number | null) => void
   dateTo: number | null
   onDateToChange: (v: number | null) => void
+  amountMin: number | null
+  onAmountMinChange: (v: number | null) => void
+  amountMax: number | null
+  onAmountMaxChange: (v: number | null) => void
   showTransfers: boolean
   onToggleTransfers: () => void
   sortKey: string
@@ -420,21 +509,16 @@ interface FilterBarProps {
 }
 
 function FilterBar({
-  search,
-  onSearchChange,
-  accountId,
-  onAccountChange,
-  dateFrom,
-  onDateFromChange,
-  dateTo,
-  onDateToChange,
-  showTransfers,
-  onToggleTransfers,
-  sortKey,
-  onSortChange,
+  search, onSearchChange,
+  accountIds, onAccountsChange,
+  dateFrom, onDateFromChange,
+  dateTo, onDateToChange,
+  amountMin, onAmountMinChange,
+  amountMax, onAmountMaxChange,
+  showTransfers, onToggleTransfers,
+  sortKey, onSortChange,
   accounts,
 }: FilterBarProps): React.JSX.Element {
-  // Debounced search
   const [localSearch, setLocalSearch] = useState(search)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -442,132 +526,49 @@ function FilterBar({
     const v = e.target.value
     setLocalSearch(v)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      onSearchChange(v)
-    }, 200)
+    debounceRef.current = setTimeout(() => onSearchChange(v), 200)
   }
 
-  // Convert unix ms to yyyy-mm-dd for date input value
-  const toDateInputVal = (ms: number | null): string => {
+  const toDateVal = (ms: number | null): string => {
     if (ms === null) return ''
     const d = new Date(ms)
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
-
-  const fromDateInput = (val: string): number | null => {
-    if (!val) return null
-    return new Date(val + 'T00:00:00').getTime()
-  }
+  const fromDateVal = (val: string): number | null => val ? new Date(val + 'T00:00:00').getTime() : null
 
   return (
-    <div
-      style={{
-        padding: '12px 28px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        flexWrap: 'wrap',
-      }}
-    >
+    <div style={{ padding: '10px 28px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8, position: 'sticky', top: 0, zIndex: 10, flexWrap: 'wrap' }}>
       {/* Search */}
-      <div
-        style={{
-          position: 'relative',
-          flex: '1 1 200px',
-          maxWidth: 320,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <svg
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="var(--text-muted)"
-          strokeWidth="1.5"
-          width={14}
-          height={14}
-          style={{ position: 'absolute', left: 9, pointerEvents: 'none', flexShrink: 0 }}
-        >
-          <circle cx="6.5" cy="6.5" r="4" />
-          <path d="M10 10l3 3" />
+      <div style={{ position: 'relative', flex: '1 1 180px', maxWidth: 280, display: 'flex', alignItems: 'center' }}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" width={13} height={13} style={{ position: 'absolute', left: 9, pointerEvents: 'none' }}>
+          <circle cx="6.5" cy="6.5" r="4" /><path d="M10 10l3 3" />
         </svg>
-        <input
-          type="text"
-          placeholder="Search transactions…"
-          value={localSearch}
-          onChange={handleSearchInput}
-          style={{
-            ...inputStyle,
-            paddingLeft: 30,
-            width: '100%',
-          }}
-        />
+        <input type="text" placeholder="Search…" value={localSearch} onChange={handleSearchInput} style={{ ...inputStyle, paddingLeft: 28, width: '100%' }} />
       </div>
 
-      {/* Account filter */}
-      <select
-        value={accountId}
-        onChange={(e) => onAccountChange(e.target.value)}
-        style={inputStyle}
-      >
-        <option value="">All accounts</option>
-        {accounts.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-      </select>
+      {/* Multi-account */}
+      <AccountMultiSelect accounts={accounts} selected={accountIds} onChange={onAccountsChange} />
 
-      {/* Date from */}
-      <input
-        type="date"
-        value={toDateInputVal(dateFrom)}
-        onChange={(e) => onDateFromChange(fromDateInput(e.target.value))}
-        style={{ ...inputStyle, colorScheme: 'dark' }}
-        title="From date"
-      />
+      {/* Date range */}
+      <input type="date" value={toDateVal(dateFrom)} onChange={e => onDateFromChange(fromDateVal(e.target.value))} style={{ ...inputStyle, colorScheme: 'dark' }} title="From date" />
+      <input type="date" value={toDateVal(dateTo)}   onChange={e => onDateToChange(fromDateVal(e.target.value))}   style={{ ...inputStyle, colorScheme: 'dark' }} title="To date" />
 
-      {/* Date to */}
-      <input
-        type="date"
-        value={toDateInputVal(dateTo)}
-        onChange={(e) => onDateToChange(fromDateInput(e.target.value))}
-        style={{ ...inputStyle, colorScheme: 'dark' }}
-        title="To date"
-      />
+      {/* Amount range */}
+      <input type="number" placeholder="$ min" value={amountMin ?? ''} onChange={e => onAmountMinChange(e.target.value ? parseFloat(e.target.value) : null)}
+        style={{ ...inputStyle, width: 80, fontFamily: 'var(--font-mono)' }} title="Min amount" />
+      <input type="number" placeholder="$ max" value={amountMax ?? ''} onChange={e => onAmountMaxChange(e.target.value ? parseFloat(e.target.value) : null)}
+        style={{ ...inputStyle, width: 80, fontFamily: 'var(--font-mono)' }} title="Max amount" />
 
       {/* Transfers toggle */}
-      <button
-        onClick={onToggleTransfers}
-        style={{
-          background: showTransfers ? 'var(--surface-2)' : 'rgba(245,158,11,0.12)',
-          border: showTransfers ? '1px solid var(--border)' : '1px solid rgba(245,158,11,0.4)',
-          borderRadius: 20,
-          color: showTransfers ? 'var(--text-muted)' : 'var(--amber)',
-          padding: '5px 12px',
-          fontFamily: 'var(--font-ui)',
-          fontSize: 12,
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Show transfers
-      </button>
+      <button onClick={onToggleTransfers} style={{
+        background: showTransfers ? 'var(--surface-2)' : 'rgba(245,158,11,0.12)',
+        border: showTransfers ? '1px solid var(--border)' : '1px solid rgba(245,158,11,0.4)',
+        borderRadius: 20, color: showTransfers ? 'var(--text-muted)' : 'var(--amber)',
+        padding: '5px 12px', fontFamily: 'var(--font-ui)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+      }}>Transfers</button>
 
       {/* Sort */}
-      <select
-        value={sortKey}
-        onChange={(e) => onSortChange(e.target.value)}
-        style={inputStyle}
-      >
+      <select value={sortKey} onChange={e => onSortChange(e.target.value)} style={inputStyle}>
         <option value="date_desc">Date (newest)</option>
         <option value="date_asc">Date (oldest)</option>
         <option value="amount_desc">Amount (largest)</option>
@@ -621,9 +622,11 @@ export default function Transactions(): React.JSX.Element {
   // Has active filters (other than defaults)
   const hasFilters =
     filters.search !== '' ||
-    filters.accountId !== '' ||
+    filters.accountIds.length > 0 ||
     filters.dateFrom !== null ||
     filters.dateTo !== null ||
+    filters.amountMin !== null ||
+    filters.amountMax !== null ||
     !filters.showTransfers
 
   return (
@@ -632,12 +635,16 @@ export default function Transactions(): React.JSX.Element {
       <FilterBar
         search={filters.search}
         onSearchChange={(v) => setFilters({ search: v })}
-        accountId={filters.accountId}
-        onAccountChange={(v) => setFilters({ accountId: v })}
+        accountIds={filters.accountIds}
+        onAccountsChange={(v) => setFilters({ accountIds: v })}
         dateFrom={filters.dateFrom}
         onDateFromChange={(v) => setFilters({ dateFrom: v })}
         dateTo={filters.dateTo}
         onDateToChange={(v) => setFilters({ dateTo: v })}
+        amountMin={filters.amountMin}
+        onAmountMinChange={(v) => setFilters({ amountMin: v })}
+        amountMax={filters.amountMax}
+        onAmountMaxChange={(v) => setFilters({ amountMax: v })}
         showTransfers={filters.showTransfers}
         onToggleTransfers={() => setFilters({ showTransfers: !filters.showTransfers })}
         sortKey={sortKey}

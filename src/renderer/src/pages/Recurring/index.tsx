@@ -18,6 +18,7 @@ interface RecurringItem {
   type: ItemType
   is_active: number
   icon: string | null
+  last_paid_date: number | null
 }
 
 interface Account { id: string; name: string }
@@ -57,6 +58,31 @@ function toMonthly(amount: number, freq: Frequency): number {
     case 'quarterly': return amount / 3
     case 'yearly':    return amount / 12
   }
+}
+
+const FREQ_ADVANCE_MS: Record<Frequency, number> = {
+  weekly:    7  * 86400000,
+  biweekly:  14 * 86400000,
+  monthly:   30 * 86400000,  // approximate; bumped from current next_due or today
+  quarterly: 91 * 86400000,
+  yearly:    365 * 86400000,
+}
+
+function advanceDueDate(current: number | null, freq: Frequency): number {
+  const base = current && current > Date.now() ? current : Date.now()
+  if (freq === 'monthly') {
+    const d = new Date(base)
+    return new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()).getTime()
+  }
+  if (freq === 'quarterly') {
+    const d = new Date(base)
+    return new Date(d.getFullYear(), d.getMonth() + 3, d.getDate()).getTime()
+  }
+  if (freq === 'yearly') {
+    const d = new Date(base)
+    return new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()).getTime()
+  }
+  return base + FREQ_ADVANCE_MS[freq]
 }
 
 function dueLabel(ts: number | null): { text: string; color: string } {
@@ -257,6 +283,15 @@ export default function Recurring() {
     load()
   }, [load])
 
+  const markPaid = useCallback(async (item: RecurringItem) => {
+    const nextDue = advanceDueDate(item.next_due_date, item.frequency)
+    await window.db.run(
+      'UPDATE recurring_items SET last_paid_date=?, next_due_date=? WHERE id=?',
+      [Date.now(), nextDue, item.id]
+    )
+    load()
+  }, [load])
+
   const deleteItem = useCallback(async (id: string) => {
     await window.db.run('DELETE FROM recurring_items WHERE id=?', [id])
     load()
@@ -394,6 +429,11 @@ export default function Recurring() {
                     {item.next_due_date && (
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: due.color }}>· due {due.text}</span>
                     )}
+                    {item.last_paid_date && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-dim)' }}>
+                        · paid {new Date(item.last_paid_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -411,6 +451,17 @@ export default function Recurring() {
 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {item.type !== 'income' && item.is_active === 1 && (
+                    <button
+                      onClick={() => markPaid(item)}
+                      title="Mark as paid — advances next due date"
+                      style={{
+                        padding: '3px 10px', borderRadius: 5, fontSize: 10.5, cursor: 'pointer',
+                        fontFamily: 'var(--font-mono)', fontWeight: 600, border: '1px solid rgba(0,201,167,0.3)',
+                        background: 'rgba(0,201,167,0.08)', color: 'var(--accent)',
+                      }}
+                    >PAID</button>
+                  )}
                   <button
                     onClick={() => toggleActive(item)}
                     title={item.is_active ? 'Deactivate' : 'Activate'}

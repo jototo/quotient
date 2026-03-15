@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 export interface TransactionFilters {
   search: string
-  accountId: string
+  accountIds: string[]     // replaces single accountId
   dateFrom: number | null
   dateTo: number | null
+  amountMin: number | null
+  amountMax: number | null
   showTransfers: boolean
   sortBy: 'date' | 'amount'
   sortDir: 'asc' | 'desc'
@@ -36,9 +38,11 @@ export interface UseTransactionsResult {
 
 const DEFAULT_FILTERS: TransactionFilters = {
   search: '',
-  accountId: '',
+  accountIds: [],
   dateFrom: null,
   dateTo: null,
+  amountMin: null,
+  amountMax: null,
   showTransfers: true,
   sortBy: 'date',
   sortDir: 'desc',
@@ -69,7 +73,7 @@ export function useTransactions(): UseTransactionsResult {
     cancelledRef.current = false
     setLoading(true)
 
-    const { search, accountId, dateFrom, dateTo, showTransfers, sortBy, sortDir, page } = filters
+    const { search, accountIds, dateFrom, dateTo, amountMin, amountMax, showTransfers, sortBy, sortDir, page } = filters
 
     const conditions: string[] = ['1=1']
     const params: unknown[] = []
@@ -78,9 +82,12 @@ export function useTransactions(): UseTransactionsResult {
       conditions.push('LOWER(t.description) LIKE ?')
       params.push(`%${search.trim().toLowerCase()}%`)
     }
-    if (accountId) {
+    if (accountIds.length === 1) {
       conditions.push('t.account_id = ?')
-      params.push(accountId)
+      params.push(accountIds[0])
+    } else if (accountIds.length > 1) {
+      conditions.push(`t.account_id IN (${accountIds.map(() => '?').join(',')})`)
+      params.push(...accountIds)
     }
     if (dateFrom !== null) {
       conditions.push('t.date >= ?')
@@ -89,6 +96,14 @@ export function useTransactions(): UseTransactionsResult {
     if (dateTo !== null) {
       conditions.push('t.date < ?')
       params.push(dateTo)
+    }
+    if (amountMin !== null) {
+      conditions.push('t.amount >= ?')
+      params.push(amountMin)
+    }
+    if (amountMax !== null) {
+      conditions.push('t.amount <= ?')
+      params.push(amountMax)
     }
     if (!showTransfers) {
       conditions.push('COALESCE(t.is_transfer, 0) = 0')
