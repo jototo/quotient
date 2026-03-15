@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A personal finance desktop app",
   "main": "./out/main/index.js",
+  "license": "MIT",
   "author": "Joshua",
   "homepage": "https://github.com/jototo/quotient",
   "scripts": {
