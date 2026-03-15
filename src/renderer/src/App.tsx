@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
@@ -13,6 +14,7 @@ import Categories from './pages/Categories'
 
 function App(): React.JSX.Element {
   return (
+    <ErrorBoundary>
     <HashRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
@@ -29,6 +31,7 @@ function App(): React.JSX.Element {
         </Route>
       </Routes>
     </HashRouter>
+    </ErrorBoundary>
   )
 }
 
