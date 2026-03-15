@@ -23,7 +23,8 @@ export interface ParseResult {
 }
 
 // Values in a bank's "Type" column that indicate a transfer/payment (not real spending)
-const TRANSFER_TYPE_KEYWORDS = ['transfer', 'payment', 'ach']
+// Note: 'ach' is intentionally excluded — it's too broad and catches payroll direct deposits
+const TRANSFER_TYPE_KEYWORDS = ['transfer', 'payment']
 
 // Substrings in the description that indicate a transfer/payment
 const TRANSFER_DESC_KEYWORDS = [
@@ -34,8 +35,17 @@ const TRANSFER_DESC_KEYWORDS = [
   'ach payment', 'ach transfer', 'internal transfer',
 ]
 
+// Income descriptions always win — never flag these as transfers even if the
+// bank's type column says "ACH" or "Payment"
+const INCOME_KEYWORDS = [
+  'payroll', 'paycheck', 'direct deposit', 'salary', 'wages',
+  'ach deposit', 'ach credit', 'tax refund', 'dividend',
+]
+
 export function isTransferTransaction(description: string, typeValue?: string): boolean {
   const desc = description.toLowerCase()
+  // Income transactions are never transfers
+  if (INCOME_KEYWORDS.some(k => desc.includes(k))) return false
   if (typeValue) {
     const type = typeValue.toLowerCase()
     if (TRANSFER_TYPE_KEYWORDS.some(k => type.includes(k))) return true
